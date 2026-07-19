@@ -5,8 +5,23 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/SampleScene.unity
     guid: 99c9720ab356a0642a771bea13969a05
+  - enabled: 1
+    path: Assets/Scenes/MainMenu.unity
+    guid: 5efe4b86868964340ab71f4e2be50418
+  - enabled: 1
+    path: Assets/Scenes/MuseumNight.unity
+    guid: fb8c4e3c86625bd498285cce526811f9
+  - enabled: 1
+    path: Assets/Scenes/FrozenCity.unity
+    guid: b466e539740196b4f80e5b492cb16d84
+  - enabled: 1
+    path: Assets/Scenes/ClockCore.unity
+    guid: 1fe5d640e32e3e64297c2cba2a19e121
+  - enabled: 1
+    path: Assets/Scenes/Victory.unity
+    guid: 2b16993681bf47542b520a62ba6f90b8
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
