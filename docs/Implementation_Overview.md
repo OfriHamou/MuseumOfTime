@@ -13,12 +13,12 @@ One line per step, in build order. The right column says which assignment requir
 | ✅ | **0.3 Repair project structure and Build Settings** — collapse the two script roots into one `Assets/Scripts/`, delete the stale `SampleScene` entry, add consistent hierarchy headers to all five scenes. <br>*Done: all scripts and the prefab moved, nested folder deleted. SampleScene removed; build list is MainMenu, MuseumNight, FrozenCity, ClockCore, Victory. Hierarchy headers already existed in the scenes.* | Lets you find and edit code instantly in the defense, where you must add and remove elements live [D3–D5] |
 | ✅ | **0.4 Version control and submission repository** — Unity `.gitignore`, verify `Library/` is untracked, push to GitHub, tag each phase. <br>*Done: `.gitignore` already correct, `Library/` untracked, work committed on branch `phase-0-cleanup`. Repo `github.com/OfriHamou/MuseumOfTime` exists and branch `phase-0-cleanup` is pushed.* | **Source code hosted in a repository, with the download link going in the GDD** [S6] |
 
-## Phase 1 — Player, cameras, animation
+## Phase 1 — Player, cameras, animation  (1.1 ✅  1.2 ✅  1.3 pending)
 
 | ✅ | Step | What requirement this satisfies |
 |---|---|---|
-|  | **1.1 Camera-relative movement, gravity, jump** — build the move vector from camera forward/right instead of world axes; grounded jump; tune step offset so the museum stairs are climbable. | Stair climbing in the two-storey building [T20]; gameplay driven by the new Input System [T12] |
-|  | **1.2 Two Cinemachine cameras and the toggle** — `CM_ThirdPerson` for exploration, `CM_FirstPerson` for Time Lens inspection, swapped on `C` by priority. Minimap camera stays separate, so three in total. | **Camera switches between first person and third person — two cameras besides the minimap** [T19] |
+| ✅ | **1.1 Camera-relative movement, gravity, jump** — build the move vector from camera forward/right instead of world axes; grounded jump; tune step offset so the museum stairs are climbable. | Stair climbing in the two-storey building [T20]; gameplay driven by the new Input System [T12] |
+| ✅ | **1.2 Two Cinemachine cameras and the toggle** — `CM_ThirdPerson` for exploration, `CM_FirstPerson` for Time Lens inspection, swapped on `C` by priority. Minimap camera stays separate, so three in total. | **Camera switches between first person and third person — two cameras besides the minimap** [T19] |
 |  | **1.3 Noa's Animator, built by hand** — author `NoaController` yourself with Idle / Walk / Run / Jump (+ Interact). An imported controller does not count. | **An Animator you defined yourself, with at least 4 states** — player half [T14] |
 
 ## Phase 2 — World geometry and art

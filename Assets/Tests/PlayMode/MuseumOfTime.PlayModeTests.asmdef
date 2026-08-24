@@ -5,7 +5,8 @@
         "MuseumOfTime.Runtime",
         "Unity.InputSystem",
         "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner"
+        "UnityEditor.TestRunner",
+        "Unity.Cinemachine"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

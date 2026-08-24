@@ -5,6 +5,11 @@ using UnityEngine;
 /// looking. Input arrives through PlayerInputReader; this script never touches
 /// the Input System itself.
 ///
+/// Noa's facing is owned by PlayerCameraRig, which turns her with mouse yaw.
+/// This script must not rotate the transform as well: two scripts rotating the
+/// same transform in the same frame fight, and the result depends on script
+/// execution order.
+///
 /// "Camera-relative" is the important part. Building the move vector straight
 /// from the raw input, as in new Vector3(input.x, 0, input.y), always pushes
 /// the player along the world axes: W walks towards world +Z no matter which
@@ -18,10 +23,6 @@ public sealed class PlayerController : MonoBehaviour
     [Header("Movement")]
     [SerializeField] private float walkSpeed = 4f;
     [SerializeField] private float runSpeed = 7f;
-
-    [Tooltip("How quickly Noa turns to face the direction she is moving, in " +
-             "degrees per second. Only used in third person.")]
-    [SerializeField] private float turnSpeed = 720f;
 
     [Header("Gravity and jumping")]
     [SerializeField] private float gravity = -20f;
@@ -107,8 +108,6 @@ public sealed class PlayerController : MonoBehaviour
         float speed = inputReader.IsRunning ? runSpeed : walkSpeed;
 
         characterController.Move(direction * speed * Time.deltaTime);
-
-        FaceMovementDirection(direction);
     }
 
     /// <summary>
@@ -143,20 +142,6 @@ public sealed class PlayerController : MonoBehaviour
         return Vector3.ClampMagnitude(direction, 1f);
     }
 
-    private void FaceMovementDirection(Vector3 direction)
-    {
-        if (direction.sqrMagnitude < 0.0001f)
-        {
-            return;
-        }
-
-        Quaternion target = Quaternion.LookRotation(direction, Vector3.up);
-
-        transform.rotation = Quaternion.RotateTowards(
-            transform.rotation,
-            target,
-            turnSpeed * Time.deltaTime);
-    }
 
     private void HandleGravityAndJump()
     {
