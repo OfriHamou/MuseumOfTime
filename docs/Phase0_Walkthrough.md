@@ -272,3 +272,112 @@ live.
 
 **Deliberately not touched:** `PlayerController`'s world-space movement bug. That is Step 1.1, the first thing in
 Phase 1.
+
+---
+
+## Part F — Verification: the scene fixes and the test suite
+
+Phase 0 was not actually finished when Part D was written. Pressing Play still did nothing, because of two
+defects in the scene itself. This part covers fixing them and building the automated check that proves it.
+
+### F.1 — Why WASD did nothing
+
+The Player's **PlayerInput** component connects each action to a method using Inspector events. Dumping all
+twenty of them showed:
+
+| Action | Wired to |
+|---|---|
+| `Player/Move` | **nothing at all** |
+| `Player/Jump` | `OnRun` — the wrong method |
+| `Player/EraBack`, `EraForward`, `Journal` | nothing (added in Part B, never wired) |
+
+`Move` pointed at an empty call list, so `moveInput` was never assigned and `PlayerController` read `(0,0)`
+every frame. This predates any of our changes. `Jump` firing `OnRun` also meant Space was setting *running*.
+
+**See it yourself:** open `MuseumNight`, select **Player**, and look at the **Player Input** component in the
+Inspector. Expand **Events → Player**. Each action has a foldout; an empty one is a dead action.
+
+### F.2 — The fix: subscribe in code, not in the Inspector
+
+Rather than repair twenty hand-made links, `PlayerInputReader` now finds its actions and subscribes itself:
+
+```csharp
+playerMap  = playerInput.actions.FindActionMap("Player", true);
+moveAction = playerMap.FindAction("Move", true);
+moveAction.performed += OnMove;
+moveAction.canceled  += OnMove;   // returns the value to zero on release
+```
+
+Twenty invisible links become twelve lines you can read. The `true` argument makes a typo throw an exception
+naming the missing action instead of failing silently.
+
+**Do it yourself in Unity:** select **Player** → Inspector → **Player Input** → the **Behavior** dropdown →
+change *Invoke Unity Events* to **Invoke C# Events**. The whole **Events** list greys out, which is the point:
+the stale wiring is ignored rather than repaired.
+
+### F.3 — Deleting the duplicate InputTester
+
+The scene had a second object, `InputTester`, carrying its own **PlayerInput** and **PlayerInputReader**. Unity
+treats every `PlayerInput` as a separate *joined player*, so two of them compete for the keyboard. With control
+schemes present this produced the error you saw:
+
+```
+Cannot find matching control scheme for InputTester
+```
+
+**Do it yourself:** Hierarchy → select **InputTester** → press **Delete**. Confirm with the Hierarchy search box
+that no second object has a Player Input component.
+
+I also removed the five control schemes I had added to `MuseumInputActions`. They caused `PlayerInput` to do
+device pairing, which is what surfaced the clash. This game is keyboard-and-mouse only and needs none.
+**To check:** double-click `MuseumInputActions` → the **Control Schemes** dropdown, top-left, should read
+*No Control Schemes*.
+
+### F.4 — Running the tests yourself
+
+**In the Editor — this is the important one.** *Window → General → Test Runner* → the **PlayMode** tab →
+**Run All**.
+
+You should see **13 green** and 1 red. The six tests that press keys only work here, with a focused Editor —
+see F.5. The red one is `Scene_HasACameraThatRenders`, a real defect covered in Step 1.2.
+
+**From a terminal** (Unity must be closed — batch mode takes an exclusive lock on the project):
+
+```
+"C:/Program Files/Unity/Hub/Editor/6000.4.8f1/Editor/Unity.exe" -batchmode -runTests -projectPath "C:/Dev/Agent-Agent/MuseumOfTime" -testPlatform PlayMode -testResults TestResults.xml
+```
+
+Results land in `TestResults.xml`. Do **not** add `-quit`: Unity exits before the tests run and writes nothing.
+
+### F.5 — Why six tests skip in batch mode
+
+Batch mode runs the player **unfocused**. The Input System's default `backgroundBehavior` setting,
+`ResetAndDisableNonBackgroundDevices`, resets and disables input devices every frame, so a simulated keypress
+cannot survive a frame boundary.
+
+Forcing it would mean setting `backgroundBehavior` to `IgnoreFocus` — a **project setting that changes how the
+shipped game behaves**. Changing the game to make a test pass is the wrong trade, so those tests call
+`Assert.Ignore` with the reason and run from the Editor Test Runner instead, where there is focus.
+
+Coverage is not lost: `ForwardInput_MovesThePlayer` and `SidewaysInput_MovesThePlayer` exercise the same
+movement path by writing to the reader directly, and both pass headlessly.
+
+### F.6 — The two assembly definition files
+
+`Assets/Scripts/MuseumOfTime.Runtime.asmdef` and `Assets/Tests/PlayMode/MuseumOfTime.PlayModeTests.asmdef`.
+
+These are required, not decorative: Unity's predefined `Assembly-CSharp` **cannot be referenced from a test
+assembly**, so the game code needs an assembly of its own before anything can test it. A useful side effect is
+that Unity now recompiles only the assembly you touched.
+
+**See them:** Project window → `Assets/Scripts` → the `MuseumOfTime.Runtime` asset. Selecting it shows its
+references in the Inspector.
+
+### F.7 — Verification checklist for this part
+
+- [ ] `MuseumNight` has no `InputTester` object.
+- [ ] Player → Player Input → **Behavior** reads *Invoke C# Events*.
+- [ ] `MuseumInputActions` shows *No Control Schemes*.
+- [ ] Test Runner → PlayMode → **Run All** gives 13 green, 1 red (the camera).
+- [ ] Entering Play Mode and holding `W` changes **Move Input** on the Player Input Reader to about `(0, 1)`.
+- [ ] Pressing `Q`, `R`, `Tab` logs *Era Back*, *Era Forward*, *Journal* in the Console.
