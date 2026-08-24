@@ -109,3 +109,4 @@ InitTestScene*.unity*
 # Test artefacts
 /TestResults.xml
 /TestRun.log
+/Setup.log
