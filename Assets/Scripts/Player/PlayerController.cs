@@ -72,6 +72,12 @@ public sealed class PlayerController : MonoBehaviour
 
         characterController.stepOffset = stepOffset;
         characterController.slopeLimit = slopeLimit;
+
+        // Unity defaults this to 0.001, which silently DISCARDS any Move
+        // smaller than a millimetre. At high framerates the per-frame gravity
+        // step falls below that, the move is thrown away, and isGrounded never
+        // becomes true - the character appears to hover and cannot jump.
+        characterController.minMoveDistance = 0f;
     }
 
     private void Start()
@@ -95,19 +101,22 @@ public sealed class PlayerController : MonoBehaviour
             CacheCamera();
         }
 
-        HandleMovement();
-        HandleGravityAndJump();
+        Vector3 horizontal = HorizontalVelocity();
+        UpdateVerticalVelocity();
+
+        // One Move per frame, deliberately. CharacterController.velocity and
+        // isGrounded both describe only the LAST Move call, so moving
+        // horizontally and then again for gravity leaves velocity reporting
+        // pure vertical motion and isGrounded reflecting the wrong step.
+        Vector3 motion = horizontal + (Vector3.up * verticalVelocity);
+        characterController.Move(motion * Time.deltaTime);
     }
 
-    private void HandleMovement()
+    private Vector3 HorizontalVelocity()
     {
-        Vector2 input = inputReader.MoveInput;
-
-        Vector3 direction = ToCameraRelativeDirection(input);
-
+        Vector3 direction = ToCameraRelativeDirection(inputReader.MoveInput);
         float speed = inputReader.IsRunning ? runSpeed : walkSpeed;
-
-        characterController.Move(direction * speed * Time.deltaTime);
+        return direction * speed;
     }
 
     /// <summary>
@@ -143,7 +152,7 @@ public sealed class PlayerController : MonoBehaviour
     }
 
 
-    private void HandleGravityAndJump()
+    private void UpdateVerticalVelocity()
     {
         if (characterController.isGrounded)
         {
@@ -167,9 +176,6 @@ public sealed class PlayerController : MonoBehaviour
         }
 
         verticalVelocity += gravity * Time.deltaTime;
-
-        characterController.Move(
-            new Vector3(0f, verticalVelocity, 0f) * Time.deltaTime);
     }
 
     private bool CanJump()
