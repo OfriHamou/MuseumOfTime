@@ -108,6 +108,16 @@ public static class MuseumSceneSetup
         so.FindProperty("cameraPivot").objectReferenceValue = pivot;
         so.ApplyModifiedPropertiesWithoutUndo();
 
+        // ---- Placeholder ground -------------------------------------------
+        // A default Unity plane is only 10x10m, so the player walks off the
+        // edge after five metres and falls out of the world. Scaled up until
+        // Step 2.1 replaces it with the actual museum.
+        GameObject ground = GameObject.Find("Ground");
+        if (ground != null && ground.transform.localScale == Vector3.one)
+        {
+            ground.transform.localScale = new Vector3(10f, 1f, 10f);
+        }
+
         // ---- Animator: the controller built by NoaAnimatorBuilder ---------
         Animator animator = Ensure<Animator>(player);
 

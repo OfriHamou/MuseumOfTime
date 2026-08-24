@@ -110,3 +110,6 @@ InitTestScene*.unity*
 /TestResults.xml
 /TestRun.log
 /Setup.log
+/Build/
+/Build.log
+/playtest-report.txt
