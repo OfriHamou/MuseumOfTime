@@ -1,4 +1,5 @@
 using Unity.Cinemachine;
+using UnityEditor.Animations;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -107,13 +108,38 @@ public static class MuseumSceneSetup
         so.FindProperty("cameraPivot").objectReferenceValue = pivot;
         so.ApplyModifiedPropertiesWithoutUndo();
 
+        // ---- Animator: the controller built by NoaAnimatorBuilder ---------
+        Animator animator = Ensure<Animator>(player);
+
+        var controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(
+            "Assets/Animations/Player/NoaController.controller");
+
+        if (controller == null)
+        {
+            Debug.LogWarning(
+                "NoaController not found. Run " +
+                "Museum of Time > Build Noa Animator Controller first.");
+        }
+        else
+        {
+            animator.runtimeAnimatorController = controller;
+            animator.applyRootMotion = false;
+        }
+
+        PlayerAnimatorDriver driver = Ensure<PlayerAnimatorDriver>(player);
+
+        var driverSo = new SerializedObject(driver);
+        driverSo.FindProperty("animator").objectReferenceValue = animator;
+        driverSo.ApplyModifiedPropertiesWithoutUndo();
+
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
 
         Debug.Log(
             "SETUP OK: camera rig built. " +
             "MainCamera(Camera+Brain), FirstPersonCamera(CM), " +
-            "ThirdPersonCamera(CM+ThirdPersonFollow), CameraPivot at 1.6m.");
+            "ThirdPersonCamera(CM+ThirdPersonFollow), CameraPivot at 1.6m, " +
+            "Animator + PlayerAnimatorDriver on Player.");
     }
 
     /// <summary>Finds a root object by name, creating it under a parent if absent.</summary>
