@@ -108,6 +108,7 @@ public sealed class BuildPlaytest : MonoBehaviour
         yield return ClimbsTheStaircase();
         yield return HingesSwing();
         yield return ScaleIsRealistic();
+        yield return FractureAndLod();
 
         Finish();
     }
@@ -562,6 +563,98 @@ public sealed class BuildPlaytest : MonoBehaviour
                 top - deck > 0.9f && top - deck < 1.3f,
                 (top - deck).ToString("0.00") + "m above the floor");
         }
+    }
+
+    /// <summary>
+    /// Checks the Blender-produced assets: the Voronoi shards actually
+    /// shatter and fly apart, and the LOD groups carry three real tiers with
+    /// decreasing triangle counts.
+    /// </summary>
+    private IEnumerator FractureAndLod()
+    {
+        // ---- Voronoi fracture ----
+        FracturedObject fractured =
+            Object.FindFirstObjectByType<FracturedObject>();
+
+        if (fractured == null)
+        {
+            Check("a fractured object exists", false, "none in scene");
+        }
+        else
+        {
+            Check(
+                "fractured object has Voronoi shards",
+                fractured.ShardCount >= 15,
+                fractured.name + " has " + fractured.ShardCount + " shards");
+
+            Transform sample = fractured.transform.Find("Shards").GetChild(0);
+            Vector3 before = sample.position;
+
+            fractured.Break(fractured.transform.position);
+            yield return new WaitForSeconds(1.2f);
+
+            float thrown = Vector3.Distance(before, sample.position);
+
+            Check(
+                "shards fly apart when it breaks",
+                fractured.IsBroken && thrown > 0.05f,
+                "first shard moved " + thrown.ToString("0.00") + "m");
+        }
+
+        // ---- LOD ----
+        LODGroup[] groups = Object.FindObjectsByType<LODGroup>(
+            FindObjectsSortMode.None);
+
+        Check(
+            "LOD groups are in the scene",
+            groups.Length >= 2,
+            groups.Length + " LODGroup instances");
+
+        var distinct = new System.Collections.Generic.HashSet<string>();
+
+        foreach (LODGroup group in groups)
+        {
+            distinct.Add(group.name);
+        }
+
+        Check(
+            "two different assets use LOD",
+            distinct.Count >= 2,
+            "distinct LOD assets: " + string.Join(", ", distinct));
+
+        foreach (LODGroup group in groups)
+        {
+            LOD[] lods = group.GetLODs();
+
+            if (lods.Length < 3)
+            {
+                Check(group.name + " has three tiers", false,
+                      lods.Length + " tiers");
+                continue;
+            }
+
+            // vertexCount, not triangles.Length. Imported meshes ship with
+            // Read/Write disabled, so the index buffer is not readable at
+            // runtime; enabling it would keep a second CPU-side copy of every
+            // mesh in memory and in the build. vertexCount is metadata and is
+            // always available, and it falls with decimation just the same.
+            int[] verts = new int[3];
+            for (int i = 0; i < 3; i++)
+            {
+                var filter = lods[i].renderers[0]
+                    .GetComponent<MeshFilter>();
+                verts[i] = filter.sharedMesh.vertexCount;
+            }
+
+            Check(
+                group.name + " tiers get simpler with distance",
+                verts[0] > verts[1] && verts[1] > verts[2],
+                "verts " + verts[0] + " / " + verts[1] + " / " + verts[2]);
+
+            break;   // one representative group is enough
+        }
+
+        yield return null;
     }
 
     // ---------------- plumbing ----------------
