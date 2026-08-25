@@ -109,6 +109,8 @@ public sealed class BuildPlaytest : MonoBehaviour
         yield return HingesSwing();
         yield return ScaleIsRealistic();
         yield return FractureAndLod();
+        yield return ResetPlayer();
+        yield return CoreSystems();
 
         Finish();
     }
@@ -657,6 +659,185 @@ public sealed class BuildPlaytest : MonoBehaviour
         yield return null;
     }
 
+    /// <summary>Phase 3: interaction, triggers, era, orb, anchors, saving.</summary>
+    private IEnumerator CoreSystems()
+    {
+        var interactor = player.GetComponent<PlayerInteractor>();
+        var hourglass = player.GetComponent<ChronoHourglass>();
+        var launcher = player.GetComponent<ChronoOrbLauncher>();
+
+        Check("player has an interactor", interactor != null, "PlayerInteractor");
+        Check("player has the Chrono Hourglass", hourglass != null, "ChronoHourglass");
+        Check("player has the orb launcher", launcher != null, "ChronoOrbLauncher");
+        Check("player is tagged Player", player.CompareTag("Player"), player.tag);
+
+        // ---- score and shards ----
+        int scoreBefore = GameManager.Instance.State.score;
+        int shardsBefore = GameManager.Instance.State.timeShards;
+
+        GameManager.Instance.AddTimeShard(1);
+
+        Check(
+            "collecting a shard raises score and count",
+            GameManager.Instance.State.timeShards == shardsBefore + 1 &&
+            GameManager.Instance.State.score > scoreBefore,
+            "shards " + shardsBefore + " to " +
+            GameManager.Instance.State.timeShards + ", score " +
+            scoreBefore + " to " + GameManager.Instance.State.score);
+
+        // ---- health ----
+        GameManager.Instance.RestoreFullHealth();
+        int healthBefore = GameManager.Instance.State.currentHealth;
+        GameManager.Instance.TakeDamage(20);
+
+        Check(
+            "taking damage lowers health",
+            GameManager.Instance.State.currentHealth == healthBefore - 20,
+            healthBefore + " to " + GameManager.Instance.State.currentHealth);
+
+        // ---- the era system ----
+        var era = Object.FindFirstObjectByType<EraManager>();
+
+        if (era == null)
+        {
+            Check("era manager exists", false, "none in scene");
+        }
+        else
+        {
+            Check("era manager exists", true,
+                "starts in " + era.CurrentEra + ", unlocked=" + era.IsUnlocked);
+
+            era.Unlock();
+            era.SetEra(TimeEra.Past);
+            yield return null;
+
+            Check(
+                "the world can change era",
+                era.CurrentEra == TimeEra.Past &&
+                GameManager.Instance.State.currentEra == TimeEra.Past,
+                "now " + era.CurrentEra);
+
+            // The signature mechanic: a change made in the past is already
+            // true later on.
+            var cart = new GameObject("TestCart");
+            cart.transform.position = new Vector3(0f, 1f, 0f);
+            var persistent = cart.AddComponent<EraPersistentObject>();
+            yield return null;
+
+            persistent.MoveTo(new Vector3(5f, 1f, 0f));
+
+            Vector3 inPresent = persistent.PositionIn(TimeEra.Present);
+            Vector3 inFuture = persistent.PositionIn(TimeEra.Future);
+
+            Check(
+                "a change in the past carries forward in time",
+                Mathf.Abs(inPresent.x - 5f) < 0.01f &&
+                Mathf.Abs(inFuture.x - 5f) < 0.01f,
+                "present x=" + inPresent.x.ToString("0.0") +
+                ", future x=" + inFuture.x.ToString("0.0"));
+
+            Object.Destroy(cart);
+            era.SetEra(TimeEra.Present);
+        }
+
+        // ---- slow time ----
+        GameManager.Instance.State.hasChronoHourglass = true;
+        GameManager.Instance.RestoreFullEnergy();
+
+        yield return Hold(Key.LeftCtrl, 0.5f);
+        float scaleWhileHeld = Time.timeScale;
+        bool slowing = hourglass.IsSlowing;
+        yield return Release();
+        yield return new WaitForSeconds(0.3f);
+
+        Check(
+            "Ctrl slows time",
+            slowing && scaleWhileHeld < 0.9f,
+            "timeScale while held = " + scaleWhileHeld.ToString("0.00"));
+
+        Check(
+            "time returns to normal on release",
+            Mathf.Approximately(Time.timeScale, 1f),
+            "timeScale = " + Time.timeScale.ToString("0.00"));
+
+        // ---- the Chrono Orb ----
+        GameManager.Instance.RestoreFullEnergy();
+        bool thrown = launcher.Throw();
+        yield return new WaitForSeconds(1.2f);
+
+        Check(
+            "the Chrono Orb is a real physical body",
+            thrown && launcher.ThrownCount > 0,
+            "thrown " + launcher.ThrownCount + ", bounces " +
+            (launcher.LastOrb != null ? launcher.LastOrb.Bounces : -1));
+
+        // ---- triggers ----
+        int triggerVolumes = Object.FindObjectsByType<PlayerTrigger>(
+            FindObjectsSortMode.None).Length;
+
+        Check(
+            "at least four trigger volumes exist",
+            triggerVolumes >= 4,
+            triggerVolumes + " PlayerTrigger volumes in the scene");
+
+        // ---- respawn returns to an anchor, not the start ----
+        var respawn = Object.FindFirstObjectByType<RespawnService>();
+
+        if (respawn == null)
+        {
+            Check("respawn service exists", false, "none in scene");
+        }
+        else
+        {
+            Vector3 anchor = new Vector3(6f, 1f, -6f);
+
+            GameManager.Instance.SaveCheckpoint(
+                SceneManager.GetActiveScene().name, anchor);
+
+            GameManager.Instance.State.checkpointEra = TimeEra.Present;
+
+            int scoreBeforeDeath = GameManager.Instance.State.score;
+            respawn.Respawn();
+            yield return new WaitForSeconds(0.4f);
+
+            float distance = Vector3.Distance(player.transform.position, anchor);
+
+            Check(
+                "failure returns Noa to the anchor, not the start",
+                respawn.LastUsedAnchor && distance < 3f,
+                "landed " + distance.ToString("0.00") + "m from the anchor");
+
+            Check(
+                "respawn restores health and costs score",
+                GameManager.Instance.State.currentHealth ==
+                    GameManager.Instance.State.maxHealth &&
+                GameManager.Instance.State.score < scoreBeforeDeath,
+                "health " + GameManager.Instance.State.currentHealth +
+                ", score " + scoreBeforeDeath + " to " +
+                GameManager.Instance.State.score);
+        }
+
+        // ---- serialization ----
+        GameManager.Instance.AcquireTimeLens();
+        SaveService.Save();
+
+        Check(
+            "game state serialises to a real file",
+            SaveService.Exists,
+            SaveService.Path);
+
+        GameManager.Instance.State.hasTimeLens = false;
+        bool loaded = SaveService.Load();
+
+        Check(
+            "saved state reloads, carrying the acquired item",
+            loaded && GameManager.Instance.State.hasTimeLens,
+            "hasTimeLens after reload = " +
+            GameManager.Instance.State.hasTimeLens);
+
+        yield return null;
+    }
+
     // ---------------- plumbing ----------------
 
     /// <summary>
@@ -721,8 +902,13 @@ public sealed class BuildPlaytest : MonoBehaviour
             failed++;
         }
 
-        report.AppendLine((ok ? "  PASS  " : "  FAIL  ") + name + "   [" +
-                          detail + "]");
+        string line = (ok ? "  PASS  " : "  FAIL  ") + name + "   [" +
+                      detail + "]";
+        report.AppendLine(line);
+
+        // Logged as it happens, not only at the end: if the run crashes
+        // partway through, the log still shows how far it got.
+        Debug.Log("PLAYTEST " + line);
     }
 
     private void Finish()

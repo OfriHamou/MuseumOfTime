@@ -113,9 +113,19 @@ public static class MuseumSceneSetup
         // edge after five metres and falls out of the world. Scaled up until
         // Step 2.1 replaces it with the actual museum.
         GameObject ground = GameObject.Find("Ground");
-        if (ground != null && ground.transform.localScale == Vector3.one)
+        if (ground != null)
         {
-            ground.transform.localScale = new Vector3(10f, 1f, 10f);
+            if (ground.transform.localScale == Vector3.one)
+            {
+                ground.transform.localScale = new Vector3(10f, 1f, 10f);
+            }
+
+            // Drop it below the museum's own floor slab. Both were at y = 0,
+            // so the two top faces shared a plane and the renderer had no way
+            // to decide which was in front: that is the flickering.
+            Vector3 groundPosition = ground.transform.position;
+            groundPosition.y = -0.35f;
+            ground.transform.position = groundPosition;
         }
 
         // ---- Animator: the controller built by NoaAnimatorBuilder ---------

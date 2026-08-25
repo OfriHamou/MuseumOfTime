@@ -329,12 +329,9 @@ public static class MuseumBuilder
             Object.DestroyImmediate(step.GetComponent<Collider>());
         }
 
-        // A landing so the top step does not end in mid-air.
+        // The walkway below already covers this ground, so a separate landing
+        // box only produced two coplanar top faces fighting each other.
         float landingZ = startZ + (stepCount * StepRun) + 1f;
-        Box(stairs.transform, "Landing",
-            new Vector3(x, FloorHeight - 0.1f, landingZ),
-            new Vector3(StairWidth, 0.2f, 2f),
-            marble);
 
         // A solid invisible wedge under the treads.
         //
@@ -375,13 +372,15 @@ public static class MuseumBuilder
         // the stairs' own x, not at the centre of the building: the first
         // version spanned only the middle of the plan, so Noa climbed the
         // stairs, ran out of floor, and fell straight back to the ground.
+        // Stop at the upper slab's west edge rather than running under it.
+        // Overlapping the slab put two floor surfaces in the same plane.
         float walkwayWest = x - (StairWidth / 2f);
-        float walkwayEast = Width / 4f;
+        float walkwayEast = 0f;
         float walkwayWidth = walkwayEast - walkwayWest;
 
         Box(stairs.transform, "Walkway",
             new Vector3(walkwayWest + (walkwayWidth / 2f),
-                        FloorHeight - 0.1f,
+                        FloorHeight,
                         landingZ),
             new Vector3(walkwayWidth, 0.2f, 3f),
             wood);
@@ -418,9 +417,11 @@ public static class MuseumBuilder
             wood);
 
         // The Clock of Creation chamber, ground floor, north wall.
+        // Ends 0.3m short of the north wall's inner face (z = 9.8). Running
+        // it right into the wall put two coplanar faces inside each other.
         Box(interior.transform, "ClockChamberWest",
-            new Vector3(-4f, 2.5f, 6f),
-            new Vector3(WallThickness, 5f, 8f),
+            new Vector3(-4f, 2.5f, 5.85f),
+            new Vector3(WallThickness, 5f, 7.5f),
             plaster);
     }
 }
