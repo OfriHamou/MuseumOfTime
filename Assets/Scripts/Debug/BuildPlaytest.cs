@@ -4,6 +4,7 @@ using System.Text;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.LowLevel;
+using UnityEngine.AI;
 using UnityEngine.SceneManagement;
 
 /// <summary>
@@ -111,6 +112,8 @@ public sealed class BuildPlaytest : MonoBehaviour
         yield return FractureAndLod();
         yield return ResetPlayer();
         yield return CoreSystems();
+        yield return ResetPlayer();
+        yield return NavigationAndAi();
 
         Finish();
     }
@@ -836,6 +839,160 @@ public sealed class BuildPlaytest : MonoBehaviour
             GameManager.Instance.State.hasTimeLens);
 
         yield return null;
+    }
+
+    /// <summary>Phase 4: two agent types, separate bakes, patrol, stealth.</summary>
+    private IEnumerator NavigationAndAi()
+    {
+        // ---- two distinct agent types exist ----
+        var warden = Object.FindFirstObjectByType<WardenAI>();
+        var shadow = Object.FindFirstObjectByType<ShadowAI>();
+
+        if (warden == null || shadow == null)
+        {
+            Check("both enemy types are in the scene", false,
+                  "warden=" + (warden != null) + " shadow=" + (shadow != null));
+            yield break;
+        }
+
+        var wardenAgent = warden.GetComponent<NavMeshAgent>();
+        var shadowAgent = shadow.GetComponent<NavMeshAgent>();
+
+        Check("both enemy types are in the scene", true,
+              warden.name + " and " + shadow.name);
+
+        Check(
+            "they use two different agent types",
+            wardenAgent.agentTypeID != shadowAgent.agentTypeID,
+            "warden id " + wardenAgent.agentTypeID +
+            ", shadow id " + shadowAgent.agentTypeID);
+
+        Check(
+            "the agent types have different dimensions",
+            !Mathf.Approximately(wardenAgent.radius, shadowAgent.radius),
+            "warden r=" + wardenAgent.radius.ToString("0.00") +
+            " h=" + wardenAgent.height.ToString("0.0") +
+            ", shadow r=" + shadowAgent.radius.ToString("0.00") +
+            " h=" + shadowAgent.height.ToString("0.0"));
+
+        Check(
+            "both agents are actually on their navmesh",
+            wardenAgent.isOnNavMesh && shadowAgent.isOnNavMesh,
+            "warden onNavMesh=" + wardenAgent.isOnNavMesh +
+            ", shadow onNavMesh=" + shadowAgent.isOnNavMesh);
+
+        // ---- the routes genuinely differ ----
+        // Same destination, two agent types. The shortcut is passable only by
+        // the smaller, more agile Shadow, so the paths must disagree.
+        Vector3 destination = new Vector3(12.5f, 0.7f, 0f);
+
+        var wardenPath = new NavMeshPath();
+        var shadowPath = new NavMeshPath();
+
+        NavMesh.CalculatePath(
+            wardenAgent.transform.position, destination,
+            new NavMeshQueryFilter
+            {
+                agentTypeID = wardenAgent.agentTypeID,
+                areaMask = NavMesh.AllAreas,
+            },
+            wardenPath);
+
+        NavMesh.CalculatePath(
+            shadowAgent.transform.position, destination,
+            new NavMeshQueryFilter
+            {
+                agentTypeID = shadowAgent.agentTypeID,
+                areaMask = NavMesh.AllAreas,
+            },
+            shadowPath);
+
+        float wardenLength = PathLength(wardenPath);
+        float shadowLength = PathLength(shadowPath);
+
+        Check(
+            "the two agent types take different routes",
+            wardenPath.status != shadowPath.status ||
+            Mathf.Abs(wardenLength - shadowLength) > 1f ||
+            wardenPath.corners.Length != shadowPath.corners.Length,
+            "warden " + wardenPath.status + " " +
+            wardenLength.ToString("0.0") + "m in " +
+            wardenPath.corners.Length + " corners; shadow " +
+            shadowPath.status + " " + shadowLength.ToString("0.0") + "m in " +
+            shadowPath.corners.Length + " corners");
+
+        // ---- patrol with pause ----
+        var route = warden.GetComponent<PatrolRoute>();
+
+        Check(
+            "the warden has a patrol route",
+            route != null && route.Count >= 2,
+            route == null ? "no PatrolRoute" : route.Count + " waypoints");
+
+        bool sawPause = false;
+        float watched = 0f;
+
+        while (watched < 14f && !sawPause)
+        {
+            if (warden.IsPaused)
+            {
+                sawPause = true;
+            }
+
+            watched += Time.deltaTime;
+            yield return null;
+        }
+
+        Check(
+            "the warden pauses on patrol",
+            sawPause,
+            sawPause
+                ? "caught it stopped and scanning after " +
+                  watched.ToString("0.0") + "s"
+                : "never paused in " + watched.ToString("0.0") + "s");
+
+        // ---- the LayerMask is real and built in code ----
+        Check(
+            "vision uses a LayerMask built in code",
+            warden.VisionBlockers.value != 0,
+            "mask value " + warden.VisionBlockers.value);
+
+        // ---- freezing, which is how the orb creates a stealth opening ----
+        warden.Freeze(2f);
+        yield return null;
+
+        Check(
+            "a Chrono Orb hit freezes a warden",
+            warden.CurrentState == WardenAI.State.Frozen,
+            "state = " + warden.CurrentState);
+
+        // ---- the warden animator ----
+        var wardenAnimator = warden.GetComponent<Animator>();
+
+        Check(
+            "the warden has our own Animator controller",
+            wardenAnimator != null &&
+            wardenAnimator.runtimeAnimatorController != null &&
+            wardenAnimator.runtimeAnimatorController.name == "WardenController",
+            wardenAnimator == null || wardenAnimator.runtimeAnimatorController == null
+                ? "missing"
+                : wardenAnimator.runtimeAnimatorController.name + ", " +
+                  wardenAnimator.runtimeAnimatorController.animationClips.Length +
+                  " clips");
+
+        yield return null;
+    }
+
+    private static float PathLength(NavMeshPath path)
+    {
+        float total = 0f;
+
+        for (int i = 1; i < path.corners.Length; i++)
+        {
+            total += Vector3.Distance(path.corners[i - 1], path.corners[i]);
+        }
+
+        return total;
     }
 
     // ---------------- plumbing ----------------
