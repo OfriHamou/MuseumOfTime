@@ -42,6 +42,15 @@ public sealed class GameState
     public Vector3 checkpointPosition = Vector3.zero;
 
     /// <summary>
+    /// Which era the player was in when the anchor armed. Returning them to
+    /// the right place in the wrong era would be its own kind of broken.
+    /// </summary>
+    public TimeEra checkpointEra = TimeEra.Present;
+
+    [Header("Era")]
+    public TimeEra currentEra = TimeEra.Present;
+
+    /// <summary>
     /// Restores all data to the values of a new game.
     /// </summary>
     public void ResetToDefaults()
@@ -64,6 +73,30 @@ public sealed class GameState
         hasCheckpoint = false;
         checkpointSceneName = "";
         checkpointPosition = Vector3.zero;
+        checkpointEra = TimeEra.Present;
+
+        currentEra = TimeEra.Present;
+    }
+
+    /// <summary>
+    /// Serialises to JSON. The requirement names Serialize explicitly, and an
+    /// in-memory singleton alone would not demonstrate it: this writes a real
+    /// file that can be opened and shown.
+    /// </summary>
+    public string ToJson()
+    {
+        return JsonUtility.ToJson(this, true);
+    }
+
+    public void LoadFromJson(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return;
+        }
+
+        JsonUtility.FromJsonOverwrite(json, this);
+        ClampValues();
     }
 
     /// <summary>

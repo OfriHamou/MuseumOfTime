@@ -32,19 +32,19 @@ One line per step, in build order. The right column says which assignment requir
 | ✅ | **2.5 LOD ×2** — Blender Decimate a marble statue and a stone column to three tiers each, assign to `LODGroup` in Unity, record the triangle counts. | **Two different assets whose polygons you reduced yourself, integrated as LOD** [T11] |
 | ✅ | **2.6 Scale and realism pass** — enforce 1 unit = 1 metre against Noa's 1.7 m; nothing floating, nothing mis-sized. | **Scale and realism appropriate to the environment** — the brief's "no floating foxes" rule [S10] |
 
-## Phase 3 — Core systems
+## Phase 3 — Core systems  ✅ COMPLETE
 
 | ✅ | Step | What requirement this satisfies |
 |---|---|---|
-|  | **3.1 Interaction system** — an `IInteractable` interface plus a camera raycast filtered by a layer mask built in code; plaque, door, pickup, lever and NPC implementations. | Carries the in-game tutorial [T2] and the layer mask written in code [T17] |
-|  | **3.2 Trigger set** — five distinct components: room entry, tutorial reveal, era zone, temporal-rift hazard, Time Anchor arming. | **At least 4 triggers** [T3] |
-|  | **3.3 Collision handling** — real `OnCollisionEnter` using contact data: orb→object, falling debris→player, Warden→player, orb→boss shield. | **At least 3 collisions detected and acted upon** [T4] |
-|  | **3.4 Health, energy, score wired to gameplay** — energy is what makes the time powers a choice; score rises on shards and falls on capture. | **Score gained and lost, plus a health and energy incentive** [T8] |
-|  | **3.5 Era system (Past / Present / Future)** — sibling zone roots swapped on `Q`/`R`; objects carry changes forward so the GDD's cart puzzle works. **The game's signature mechanic.** | **How interesting the game is — the brief's primary criterion, worth up to 5 points** [G1] |
-|  | **3.6 Chrono Hourglass slow-time** — `Time.timeScale` with matched physics step, energy drain, unscaled UI, unmistakable feedback. | **Second of the two items acquired in one scene and required in the next** [T9] |
-|  | **3.7 Chrono Orb projectile** — a rigidbody sphere thrown from the active camera; on impact it freezes or rewinds rather than destroys. | **Shooting — a physical body that is fired and impacts** [T15] |
-|  | **3.8 Time Anchors — hidden teleports** — at least two each in FrozenCity and ClockCore only; invisible without the Time Lens; failure returns Noa to the last anchor with health refreshed and a score penalty. | **From scene 2 onward, two hidden teleports; on failure the player returns to the teleport rather than the start, with health restored** [T21] |
-|  | **3.9 Cross-scene persistence and the two items** — JSON save/load; Time Lens granted in scene 1 and *required* in scene 2, Chrono Hourglass granted in scene 2 and *required* in scene 3. | **Serialized data passed between scenes, including two acquired items** [T9]; makes the three scenes one connected game [S9] |
+| ✅ | **3.1 Interaction system** — an `IInteractable` interface plus a camera raycast filtered by a layer mask built in code; plaque, door, pickup, lever and NPC implementations. | Carries the in-game tutorial [T2] and the layer mask written in code [T17] |
+| ✅ | **3.2 Trigger set** — five distinct components: room entry, tutorial reveal, era zone, temporal-rift hazard, Time Anchor arming. | **At least 4 triggers** [T3] |
+| ✅ | **3.3 Collision handling** — real `OnCollisionEnter` using contact data: orb→object, falling debris→player, Warden→player, orb→boss shield. | **At least 3 collisions detected and acted upon** [T4] |
+| ✅ | **3.4 Health, energy, score wired to gameplay** — energy is what makes the time powers a choice; score rises on shards and falls on capture. | **Score gained and lost, plus a health and energy incentive** [T8] |
+| ✅ | **3.5 Era system (Past / Present / Future)** — sibling zone roots swapped on `Q`/`R`; objects carry changes forward so the GDD's cart puzzle works. **The game's signature mechanic.** | **How interesting the game is — the brief's primary criterion, worth up to 5 points** [G1] |
+| ✅ | **3.6 Chrono Hourglass slow-time** — `Time.timeScale` with matched physics step, energy drain, unscaled UI, unmistakable feedback. | **Second of the two items acquired in one scene and required in the next** [T9] |
+| ✅ | **3.7 Chrono Orb projectile** — a rigidbody sphere thrown from the active camera; on impact it freezes or rewinds rather than destroys. | **Shooting — a physical body that is fired and impacts** [T15] |
+| ✅ | **3.8 Time Anchors — hidden teleports** — at least two each in FrozenCity and ClockCore only; invisible without the Time Lens; failure returns Noa to the last anchor with health refreshed and a score penalty. | **From scene 2 onward, two hidden teleports; on failure the player returns to the teleport rather than the start, with health restored** [T21] |
+| ✅ | **3.9 Cross-scene persistence and the two items** — JSON save/load; Time Lens granted in scene 1 and *required* in scene 2, Chrono Hourglass granted in scene 2 and *required* in scene 3. | **Serialized data passed between scenes, including two acquired items** [T9]; makes the three scenes one connected game [S9] |
 
 ## Phase 4 — AI, navigation, stealth
 
