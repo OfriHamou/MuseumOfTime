@@ -1,6 +1,6 @@
 # Museum of Time — Implementation Overview
 
-**Student:** עפרי חמו — 211906813 · **Engine:** Unity 6000.4.8f1, URP · **Full detail:** `docs/Implementation_Plan.md` · **Phase 1 click-by-click:** `docs/Phase1_Unity_Walkthrough.md`
+**Student:** עפרי חמו — 211906813 · **Engine:** Unity 6000.4.8f1, URP · **Full detail:** `docs/Implementation_Plan.md` · **Click-by-click:** `docs/Phase1_Unity_Walkthrough.md`, `docs/Phase2_Unity_Walkthrough.md`
 
 One line per step, in build order. The right column says which assignment requirement the step satisfies, in plain words. **Bold** means the step closes that requirement; plain text means it contributes to it. The first column tracks progress: **✅** done, **◐** partly done with a step left for you, blank not started. The code in brackets is only a pointer to the same requirement in the full plan — you never need it to read this page.
 
