@@ -6,7 +6,8 @@
         "Unity.InputSystem",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
-        "Unity.Cinemachine"
+        "Unity.Cinemachine",
+        "Unity.AI.Navigation"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
