@@ -21,16 +21,16 @@ One line per step, in build order. The right column says which assignment requir
 | ✅ | **1.2 Two Cinemachine cameras and the toggle** — `CM_ThirdPerson` for exploration, `CM_FirstPerson` for Time Lens inspection, swapped on `C` by priority. Minimap camera stays separate, so three in total. | **Camera switches between first person and third person — two cameras besides the minimap** [T19] |
 | ✅ | **1.3 Noa's Animator, built by hand** — author `NoaController` yourself with Idle / Walk / Run / Jump (+ Interact). An imported controller does not count. | **An Animator you defined yourself, with at least 4 states** — player half [T14] |
 
-## Phase 2 — World geometry and art
+## Phase 2 — World geometry and art  (2.1 ✅  2.3 ✅  2.6 ✅  ·  2.2 next  ·  2.4/2.5 need Blender)
 
 | ✅ | Step | What requirement this satisfies |
 |---|---|---|
-|  | **2.1 The museum: two storeys with stairs** — build in ProBuilder; ground-floor galleries, upper-floor mezzanine and curator's office, a real walkable staircase, textures you chose yourself. | **A designed two-storey building with your own textures and stair climbing** [T20] |
+| ✅ | **2.1 The museum: two storeys with stairs** — build in ProBuilder; ground-floor galleries, upper-floor mezzanine and curator's office, a real walkable staircase, textures you chose yourself. | **A designed two-storey building with your own textures and stair climbing** [T20] |
 |  | **2.2 FrozenCity Terrain** — hand-sculpt a Unity Terrain with three paint layers, framing the clock tower. Keep detail density low for the size budget. | **Terrain built by you** [T6]; keeps the build under the 300 MB cap [S1] |
-|  | **2.3 Hinge joint set pieces** — Clock of Creation pendulum, clock-tower bell, gallery gate. Build all three so one failure does not cost the requirement. | **Physical hinge joints** [T5]; gives the projectile something to hit [T15] |
+| ✅ | **2.3 Hinge joint set pieces** — Clock of Creation pendulum, clock-tower bell, gallery gate. Build all three so one failure does not cost the requirement. | **Physical hinge joints** [T5]; gives the projectile something to hit [T15] |
 |  | **2.4 Voronoi fracture ×2** — Blender Cell Fracture on the Clock of Creation and a frozen statue, 15–40 pieces each, collider and rigidbody per shard. **Start early — external tool dependency.** | **Two assets you fractured yourself with Voronoi, appearing intrinsically in the game** [T10] |
 |  | **2.5 LOD ×2** — Blender Decimate a marble statue and a stone column to three tiers each, assign to `LODGroup` in Unity, record the triangle counts. | **Two different assets whose polygons you reduced yourself, integrated as LOD** [T11] |
-|  | **2.6 Scale and realism pass** — enforce 1 unit = 1 metre against Noa's 1.7 m; nothing floating, nothing mis-sized. | **Scale and realism appropriate to the environment** — the brief's "no floating foxes" rule [S10] |
+| ✅ | **2.6 Scale and realism pass** — enforce 1 unit = 1 metre against Noa's 1.7 m; nothing floating, nothing mis-sized. | **Scale and realism appropriate to the environment** — the brief's "no floating foxes" rule [S10] |
 
 ## Phase 3 — Core systems
 

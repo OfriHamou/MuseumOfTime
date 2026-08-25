@@ -104,6 +104,10 @@ public sealed class BuildPlaytest : MonoBehaviour
         yield return CameraToggles();
         yield return ResetPlayer();
         yield return AnimatorReacts();
+        yield return ResetPlayer();
+        yield return ClimbsTheStaircase();
+        yield return HingesSwing();
+        yield return ScaleIsRealistic();
 
         Finish();
     }
@@ -300,6 +304,264 @@ public sealed class BuildPlaytest : MonoBehaviour
             "animator leaves Idle while walking",
             stateName == "Walk" || stateName == "Run",
             "state while moving = " + stateName);
+    }
+
+    /// <summary>
+    /// Walks up the museum staircase. This is the real proof for the
+    /// two-storey requirement: not that stairs exist, but that the
+    /// CharacterController's step offset actually lets Noa climb them.
+    /// </summary>
+    private IEnumerator ClimbsTheStaircase()
+    {
+        GameObject stairs = GameObject.Find("Staircase");
+
+        if (stairs == null)
+        {
+            Check("staircase exists", false, "no 'Staircase' object");
+            yield break;
+        }
+
+        Check("staircase exists", true,
+            stairs.transform.childCount + " steps and landings");
+
+        // Put Noa at the foot of the stairs, facing along them (+Z).
+        Transform firstStep = stairs.transform.Find("Step00");
+        CharacterController cc = player.GetComponent<CharacterController>();
+
+        cc.enabled = false;
+        player.transform.position = firstStep.position + new Vector3(0f, 1.2f, -1.5f);
+        player.transform.rotation = Quaternion.identity;
+        cc.enabled = true;
+
+        // Give Cinemachine time to catch up after the teleport: W is
+        // camera-relative, so a lagging camera sends Noa the wrong way.
+        yield return new WaitForSeconds(1.5f);
+
+        Vector3 startPos = player.transform.position;
+        float startY = startPos.y;
+        Vector3 camFwd = Camera.main.transform.forward;
+
+        Collider stepCollider = firstStep.GetComponent<Collider>();
+        report.AppendLine("        (Step00 collider: " +
+            (stepCollider == null ? "NONE" : stepCollider.GetType().Name +
+             " enabled=" + stepCollider.enabled +
+             " bounds=" + stepCollider.bounds) + ")");
+
+        CharacterController ccInfo = player.GetComponent<CharacterController>();
+        report.AppendLine("        (CC height=" + ccInfo.height +
+            " radius=" + ccInfo.radius + " center=" + ccInfo.center +
+            " stepOffset=" + ccInfo.stepOffset.ToString("0.00") +
+            " feetY=" + (player.transform.position.y + ccInfo.center.y -
+                         (ccInfo.height / 2f)).ToString("0.00") + ")");
+
+        // Is anything actually solid where the stairs are?
+        Vector3 probe = new Vector3(firstStep.position.x, 6f, -3.5f);
+        if (Physics.Raycast(probe, Vector3.down, out RaycastHit hit, 20f))
+        {
+            report.AppendLine("        (raycast down over the stairs hit '" +
+                hit.collider.name + "' on layer " + hit.collider.gameObject.layer +
+                " at y=" + hit.point.y.ToString("0.00") + ")");
+        }
+        else
+        {
+            report.AppendLine("        (raycast down over the stairs hit NOTHING)");
+        }
+
+        report.AppendLine("        (player layer " + player.layer +
+            ", collides with Default? " +
+            !Physics.GetIgnoreLayerCollision(player.layer, 0) + ")");
+
+        report.AppendLine("        (Step00 at " + firstStep.position +
+                          ", player at " + startPos +
+                          ", camera forward " + camFwd.ToString("0.00") + ")");
+
+        // Drop Noa directly onto the middle of the ramp. If she rests there
+        // the surface collides and the problem is step-up; if she falls to
+        // floor level the surface is not colliding with the controller.
+        cc.enabled = false;
+        player.transform.position = new Vector3(firstStep.position.x, 4.5f, -3.5f);
+        cc.enabled = true;
+        yield return new WaitForSeconds(1.5f);
+
+        report.AppendLine("        (dropped onto ramp mid-point, settled at y=" +
+            player.transform.position.y.ToString("0.00") +
+            ", grounded=" + cc.isGrounded + ")");
+
+        // Back to the foot of the stairs for the real climb attempt.
+        cc.enabled = false;
+        player.transform.position = startPos;
+        player.transform.rotation = Quaternion.identity;
+        cc.enabled = true;
+        yield return new WaitForSeconds(1.0f);
+
+        // Track the highest point reached. Measuring only the final position
+        // is wrong: she can climb correctly and then walk on past the top.
+        float peakY = startY;
+
+        // Sample the walk itself: where is she, and what is under her feet?
+        for (int sample = 0; sample < 4; sample++)
+        {
+            yield return Hold(Key.W, 1f);
+
+            Vector3 pos = player.transform.position;
+            peakY = Mathf.Max(peakY, pos.y);
+            string under = "nothing";
+
+            if (Physics.Raycast(pos + Vector3.up, Vector3.down, out RaycastHit floor, 6f))
+            {
+                under = floor.collider.name + " @y=" + floor.point.y.ToString("0.00");
+            }
+
+            report.AppendLine("        (t=" + (sample + 1) + "s pos=" +
+                pos.ToString("0.00") + " grounded=" + cc.isGrounded +
+                " under=" + under + ")");
+        }
+
+        yield return Release();
+
+        float climbed = peakY - startY;
+        report.AppendLine("        (ended at " + player.transform.position +
+                          ", moved " + (player.transform.position - startPos).ToString("0.00") + ")");
+
+        Check(
+            "Noa can climb the staircase",
+            climbed > 2f,
+            "rose " + climbed.ToString("0.00") + "m (from y " +
+            startY.ToString("0.00") + " to a peak of " +
+            peakY.ToString("0.00") + ")");
+
+        Check(
+            "reached the upper floor",
+            peakY > 4.5f,
+            "peak y = " + peakY.ToString("0.00") +
+            ", upper slab is at y = 5");
+
+        Check(
+            "stays on the upper floor instead of falling off",
+            player.transform.position.y > 4f,
+            "y after walking on = " +
+            player.transform.position.y.ToString("0.00"));
+    }
+
+    /// <summary>
+    /// Confirms the hinge joints are real physics joints that move, rather
+    /// than static props that merely have the component attached.
+    /// </summary>
+    private IEnumerator HingesSwing()
+    {
+        string[] names =
+        {
+            "ClockOfCreationPendulum", "GalleryGate", "ExhibitSignboard",
+        };
+
+        foreach (string name in names)
+        {
+            GameObject go = GameObject.Find(name);
+
+            if (go == null)
+            {
+                Check(name + " exists", false, "not found in scene");
+                continue;
+            }
+
+            HingeJoint joint = go.GetComponent<HingeJoint>();
+
+            if (joint == null)
+            {
+                Check(name + " has a HingeJoint", false, "component missing");
+                continue;
+            }
+
+            // Nudge it, rather than hoping it is still swinging on its own.
+            // By this point in the run any starting motion has damped out, so
+            // measuring passively would test nothing.
+            var body = go.GetComponent<Rigidbody>();
+            body.WakeUp();
+
+            if (joint.useMotor)
+            {
+                // A motorised joint has usually already driven itself to its
+                // limit and gone to sleep by now, so reverse it and watch it
+                // travel back. That proves the motor and joint both work.
+                JointMotor motor = joint.motor;
+                motor.targetVelocity = -motor.targetVelocity;
+                joint.motor = motor;
+            }
+            else
+            {
+                body.AddTorque(joint.axis.normalized * 40f, ForceMode.Impulse);
+            }
+
+            Quaternion before = go.transform.rotation;
+            yield return new WaitForSeconds(0.8f);
+
+            if (name == "GalleryGate")
+            {
+                report.AppendLine("        (gate angle=" +
+                    joint.angle.ToString("0.0") +
+                    " angVel=" + body.angularVelocity.ToString("0.00") +
+                    " kinematic=" + body.isKinematic +
+                    " sleeping=" + body.IsSleeping() +
+                    " useMotor=" + joint.useMotor +
+                    " mass=" + body.mass + ")");
+            }
+            float moved = Quaternion.Angle(before, go.transform.rotation);
+
+            Check(
+                name + " swings on its hinge",
+                moved > 1f,
+                "rotated " + moved.ToString("0.0") + " degrees after an " +
+                "impulse, axis " + joint.axis + ", limits " +
+                joint.limits.min + " to " + joint.limits.max);
+        }
+    }
+
+    /// <summary>
+    /// The brief judges scale explicitly, so the key dimensions are measured
+    /// rather than eyeballed.
+    /// </summary>
+    private IEnumerator ScaleIsRealistic()
+    {
+        yield return null;
+
+        GameObject stairs = GameObject.Find("Staircase");
+
+        if (stairs != null)
+        {
+            Transform a = stairs.transform.Find("Step00");
+            Transform b = stairs.transform.Find("Step01");
+
+            if (a != null && b != null)
+            {
+                float rise = b.position.y - a.position.y;
+
+                // Real staircases sit around 0.15-0.20m per step.
+                Check(
+                    "step rise is human-sized",
+                    rise > 0.10f && rise < 0.22f,
+                    rise.ToString("0.000") + "m per step");
+            }
+        }
+
+        CharacterController cc = player.GetComponent<CharacterController>();
+
+        Check(
+            "Noa is roughly human height",
+            cc.height > 1.4f && cc.height < 2.1f,
+            "CharacterController height = " + cc.height.ToString("0.00") + "m");
+
+        GameObject railing = GameObject.Find("RailEdge");
+        if (railing != null)
+        {
+            float top = railing.transform.position.y +
+                        (railing.transform.localScale.y / 2f);
+            float deck = 5f;
+
+            Check(
+                "mezzanine railing is a safe height",
+                top - deck > 0.9f && top - deck < 1.3f,
+                (top - deck).ToString("0.00") + "m above the floor");
+        }
     }
 
     // ---------------- plumbing ----------------
