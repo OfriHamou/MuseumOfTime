@@ -187,9 +187,9 @@ public static class ClockCoreContentBuilder
         tpCam.Lens.FieldOfView = 60f;
 
         CinemachineThirdPersonFollow follow = Ensure<CinemachineThirdPersonFollow>(thirdPerson);
-        follow.ShoulderOffset = new Vector3(0.5f, 0.2f, 0f);
-        follow.VerticalArmLength = 0.2f;
-        follow.CameraDistance = 4.5f;
+        follow.ShoulderOffset = new Vector3(0.5f, 0f, 0f);
+        follow.VerticalArmLength = 0.15f;
+        follow.CameraDistance = 2.6f;
 
         var rigSo = new SerializedObject(player.GetComponent<PlayerCameraRig>());
         rigSo.FindProperty("thirdPersonCamera").objectReferenceValue = tpCam;

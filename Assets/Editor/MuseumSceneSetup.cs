@@ -95,9 +95,16 @@ public static class MuseumSceneSetup
         CinemachineThirdPersonFollow follow =
             Ensure<CinemachineThirdPersonFollow>(thirdPerson);
 
-        follow.ShoulderOffset = new Vector3(0.5f, 0.2f, 0f);
-        follow.VerticalArmLength = 0.2f;
-        follow.CameraDistance = 4.5f;
+        // MuseumNight's hand-built Player root sits ~0.48m higher (world Y ~= 1)
+        // than FrozenCity/ClockCore's prefab-based players (world Y ~= 0.52),
+        // and CameraPivot uses the same local (0, 1.6, 0) offset in all three
+        // scenes. Without compensation the whole third-person rig would sit
+        // that much higher here than in the other two scenes. Compensating
+        // via ShoulderOffset.y (not CameraPivot) keeps first-person, which
+        // reads CameraPivot directly, completely unaffected.
+        follow.ShoulderOffset = new Vector3(0.5f, -0.48f, 0f);
+        follow.VerticalArmLength = 0.15f;
+        follow.CameraDistance = 2.6f;
 
         // ---- The rig component that switches between them -----------------
         PlayerCameraRig rig = Ensure<PlayerCameraRig>(player);
