@@ -1,0 +1,423 @@
+using System.IO;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+/// <summary>
+/// Presentation pass: dresses the three gameplay scenes so they read as
+/// intentional places rather than blockout, using only assets already in the
+/// repository (the MarbleStatue / StoneColumn LOD prefabs, the museum
+/// materials) plus a handful of small dressing materials created here.
+///
+///   Unity.exe -batchmode -quit -projectPath . ^
+///             -executeMethod ScenePolishBuilder.BuildFromCommandLine
+///
+/// GAMEPLAY SAFETY. This adds NO gameplay and changes NO gameplay logic. All
+/// dressing goes under a single "SceneDressing" root that is cleared and
+/// rebuilt each run, and every dressing prop is DECORATIVE (colliders
+/// stripped) so it can never block a NavMeshAgent or the player - the one
+/// exception is ClockCore's four containment walls, which sit on the arena
+/// edge outside where agents roam and only stop the player walking off. No
+/// navmesh is re-baked. The only touches to existing objects are cosmetic:
+/// assigning a material to an enemy/pickup/anchor renderer.
+/// </summary>
+public static class ScenePolishBuilder
+{
+    private const string DressingRoot = "SceneDressing";
+    private const string MatFolder = "Assets/Materials/Dressing";
+
+    private const string MarblePrefab = "Assets/Prefabs/World/MarbleStatue.prefab";
+    private const string ColumnPrefab = "Assets/Prefabs/World/StoneColumn.prefab";
+
+    // Shared material handles, filled by EnsureMaterials.
+    private static Material marble, plaster, brass, roof, warden, shadowMat, shardGlow, lensGlow, collectorMat, shieldMat;
+
+    [MenuItem("Museum of Time/Polish Scenes (dressing)")]
+    public static void BuildMenu() { Build(); }
+
+    public static void BuildFromCommandLine() { Build(); }
+
+    private static void Build()
+    {
+        EnsureMaterials();
+
+        PolishMuseumNight();
+        PolishFrozenCity();
+        PolishClockCore();
+
+        Debug.Log("SCENE POLISH OK: MuseumNight, FrozenCity and ClockCore dressed with existing assets.");
+    }
+
+    // -----------------------------------------------------------------
+    // Materials
+    // -----------------------------------------------------------------
+
+    private static void EnsureMaterials()
+    {
+        Directory.CreateDirectory(MatFolder);
+
+        marble = Load("Assets/Materials/Museum/MuseumMarble.mat");
+        plaster = Load("Assets/Materials/Museum/MuseumPlaster.mat");
+        brass = Load("Assets/Materials/Museum/MuseumBrass.mat");
+
+        roof = Mat("Roof", new Color(0.17f, 0.17f, 0.20f), null, 0.1f, 0.2f);
+        warden = Mat("Warden", new Color(0.22f, 0.22f, 0.26f), null, 0.25f, 0.35f);
+        shadowMat = Mat("Shadow", new Color(0.16f, 0.13f, 0.28f), new Color(0.18f, 0.12f, 0.4f), 0f, 0.5f);
+        shardGlow = Mat("ShardGlow", new Color(0.35f, 0.85f, 1f), new Color(0.25f, 0.75f, 1f), 0f, 0.7f);
+        lensGlow = Mat("LensGlow", new Color(1f, 0.78f, 0.35f), new Color(0.95f, 0.6f, 0.2f), 0.3f, 0.6f);
+        collectorMat = Mat("Collector", new Color(0.14f, 0.06f, 0.06f), new Color(0.35f, 0.05f, 0.05f), 0.3f, 0.4f);
+        shieldMat = Mat("Shield", new Color(0.85f, 0.8f, 0.45f), new Color(0.6f, 0.5f, 0.18f), 0.6f, 0.8f);
+    }
+
+    private static Material Load(string path)
+    {
+        return AssetDatabase.LoadAssetAtPath<Material>(path);
+    }
+
+    private static Material Mat(string name, Color baseColor, Color? emission, float metallic, float smoothness)
+    {
+        string path = MatFolder + "/" + name + ".mat";
+        Material existing = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (existing != null)
+        {
+            return existing;
+        }
+
+        var m = new Material(Shader.Find("Universal Render Pipeline/Lit")) { name = name };
+        m.SetColor("_BaseColor", baseColor);
+        m.SetFloat("_Metallic", metallic);
+        m.SetFloat("_Smoothness", smoothness);
+
+        if (emission.HasValue)
+        {
+            m.EnableKeyword("_EMISSION");
+            m.SetColor("_EmissionColor", emission.Value);
+            m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+        }
+
+        AssetDatabase.CreateAsset(m, path);
+        return m;
+    }
+
+    // -----------------------------------------------------------------
+    // MuseumNight - already the best-dressed scene (building, columns,
+    // statues, hinge props, Phase 7 lighting). A light readability pass only.
+    // -----------------------------------------------------------------
+
+    private static void PolishMuseumNight()
+    {
+        Scene scene = EditorSceneManager.OpenScene("Assets/Scenes/MuseumNight.unity", OpenSceneMode.Single);
+
+        Recolor("TimeShard_A", shardGlow);
+        Recolor("TimeShard_B", shardGlow);
+        Recolor("TimeLens", lensGlow);
+        Recolor("Plaque_ClockOfCreation", brass);
+        Recolor("TimeWarden", warden);
+        Recolor("ChronologicalShadow", shadowMat);
+
+        Save(scene);
+    }
+
+    // -----------------------------------------------------------------
+    // FrozenCity - the frozen city that stopped before sunset: streets of
+    // buildings leading to the clock tower, motionless citizens, a readable
+    // tower landmark.
+    // -----------------------------------------------------------------
+
+    private static void PolishFrozenCity()
+    {
+        Scene scene = EditorSceneManager.OpenScene("Assets/Scenes/FrozenCity.unity", OpenSceneMode.Single);
+
+        Terrain terrain = Terrain.activeTerrain;
+        GameObject root = FreshRoot();
+
+        // Streets: buildings flanking a clear central corridor (x within +-4)
+        // that runs from spawn (z=-20) to the tower (z=35). Non-colliding, so
+        // they never block the path or the patrols.
+        int[] heights = { 6, 8, 5, 9, 7, 6 };
+        int[] zs = { -12, -4, 4, 12, 20, 28 };
+        for (int i = 0; i < zs.Length; i++)
+        {
+            BuildBuilding(root, terrain, new Vector3(-9f, 0f, zs[i]), 5f, heights[i], 4f);
+            BuildBuilding(root, terrain, new Vector3(9f, 0f, zs[(i + 3) % zs.Length]), 5f, heights[(i + 2) % heights.Length], 4f);
+        }
+
+        // Motionless citizens - the city froze mid-life.
+        Vector3[] citizens =
+        {
+            new Vector3(-12f, 0f, -8f), new Vector3(12f, 0f, -6f), new Vector3(-14f, 0f, 4f),
+            new Vector3(13f, 0f, 8f), new Vector3(-10f, 0f, 16f), new Vector3(11f, 0f, 18f),
+            new Vector3(-13f, 0f, 24f), new Vector3(12f, 0f, 28f), new Vector3(-7f, 0f, 33f),
+            new Vector3(8f, 0f, 33f), new Vector3(14f, 0f, -14f), new Vector3(-15f, 0f, 12f),
+        };
+        for (int i = 0; i < citizens.Length; i++)
+        {
+            Prop(MarblePrefab, root, OnTerrain(terrain, citizens[i]),
+                 Vector3.one * 0.9f, new Vector3(0f, i * 47f % 360f, 0f));
+        }
+
+        // Lanterns down the central path - a lit route to the tower.
+        foreach (int z in new[] { -12, -2, 8, 18, 28 })
+        {
+            BuildLantern(root, OnTerrain(terrain, new Vector3(-2.5f, 0f, z)));
+            BuildLantern(root, OnTerrain(terrain, new Vector3(2.5f, 0f, z)));
+        }
+
+        DressClockTower(root, terrain);
+
+        // Readability of the gameplay pieces.
+        Recolor("TimeWarden", warden);
+        Recolor("ChronologicalShadow", shadowMat);
+        Recolor("ChronoHourglass", lensGlow);
+        RecolorChild("TimeAnchor_Overlook", "LensVisual", lensGlow);
+        RecolorChild("TimeAnchor_TowerBase", "LensVisual", lensGlow);
+
+        Save(scene);
+    }
+
+    private static void DressClockTower(GameObject root, Terrain terrain)
+    {
+        GameObject tower = GameObject.Find("ClockTower");
+        if (tower == null)
+        {
+            return;
+        }
+
+        Vector3 basePos = tower.transform.position;   // (0,0,35)
+
+        // A clock face on the approach (-Z) side, so the tower reads as a
+        // clock and as the objective from spawn.
+        Cube(root, "ClockFace", basePos + new Vector3(0f, 16f, -3.2f),
+             new Vector3(4f, 4f, 0.3f), Vector3.zero, brass, false);
+        Cube(root, "ClockHandHour", basePos + new Vector3(0f, 16f, -3.4f),
+             new Vector3(0.18f, 1.4f, 0.18f), new Vector3(0f, 0f, 25f), roof, false);
+        Cube(root, "ClockHandMinute", basePos + new Vector3(0f, 16f, -3.4f),
+             new Vector3(0.14f, 2.1f, 0.14f), new Vector3(0f, 0f, 110f), roof, false);
+
+        // A stepped roof cap over the belfry.
+        Cube(root, "TowerRoof", basePos + new Vector3(0f, 28.5f, 0f),
+             new Vector3(9f, 1.5f, 9f), Vector3.zero, roof, false);
+        Cube(root, "TowerSpire", basePos + new Vector3(0f, 30.5f, 0f),
+             new Vector3(4.5f, 3f, 4.5f), new Vector3(0f, 45f, 0f), roof, false);
+
+        // Buttress columns at the tower corners.
+        foreach (Vector3 corner in new[]
+                 {
+                     new Vector3(3.6f, 0f, 31.4f), new Vector3(-3.6f, 0f, 31.4f),
+                     new Vector3(3.6f, 0f, 38.6f), new Vector3(-3.6f, 0f, 38.6f),
+                 })
+        {
+            Prop(ColumnPrefab, root, OnTerrain(terrain, corner), Vector3.one, Vector3.zero);
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // ClockCore - the inverted museum arena: enclosing walls, a ceiling with
+    // statues hanging from it, columns framing the boss on a central dais.
+    // -----------------------------------------------------------------
+
+    private static void PolishClockCore()
+    {
+        Scene scene = EditorSceneManager.OpenScene("Assets/Scenes/ClockCore.unity", OpenSceneMode.Single);
+
+        GameObject root = FreshRoot();
+
+        // Containment walls on the 40x40 floor edge. COLLIDING - the one
+        // exception - so the player cannot walk off the arena; they sit
+        // outside where the agents patrol (the centre), so navmesh is untouched.
+        Cube(root, "WallNorth", new Vector3(0f, 4f, 20f), new Vector3(40f, 8f, 1f), Vector3.zero, marble, true);
+        Cube(root, "WallSouth", new Vector3(0f, 4f, -20f), new Vector3(40f, 8f, 1f), Vector3.zero, marble, true);
+        Cube(root, "WallEast", new Vector3(20f, 4f, 0f), new Vector3(1f, 8f, 40f), Vector3.zero, marble, true);
+        Cube(root, "WallWest", new Vector3(-20f, 4f, 0f), new Vector3(1f, 8f, 40f), Vector3.zero, marble, true);
+
+        // The inverted museum: a marble ceiling, with statues and columns
+        // hanging down from it.
+        Cube(root, "Ceiling", new Vector3(0f, 8f, 0f), new Vector3(40f, 0.5f, 40f), Vector3.zero, marble, false);
+
+        foreach (Vector3 p in new[] { new Vector3(10f, 8f, -6f), new Vector3(-10f, 8f, -6f), new Vector3(6f, 8f, 11f) })
+        {
+            Prop(MarblePrefab, root, p, Vector3.one, new Vector3(180f, 0f, 0f));   // upside down
+        }
+        foreach (Vector3 p in new[] { new Vector3(8f, 8f, 6f), new Vector3(-8f, 8f, 6f) })
+        {
+            Prop(ColumnPrefab, root, p, Vector3.one, new Vector3(180f, 0f, 0f));
+        }
+
+        // Upright columns framing the arena, and a few statues on the floor.
+        foreach (Vector3 p in new[]
+                 {
+                     new Vector3(14f, 0f, 14f), new Vector3(-14f, 0f, 14f),
+                     new Vector3(14f, 0f, -14f), new Vector3(-14f, 0f, -14f),
+                     new Vector3(16f, 0f, 0f), new Vector3(-16f, 0f, 0f),
+                     new Vector3(0f, 0f, 16f), new Vector3(0f, 0f, -16f),
+                 })
+        {
+            Prop(ColumnPrefab, root, p, Vector3.one, Vector3.zero);
+        }
+        foreach (Vector3 p in new[] { new Vector3(14f, 0f, 0f), new Vector3(-14f, 0f, 0f), new Vector3(0f, 0f, 14f) })
+        {
+            Prop(MarblePrefab, root, p, Vector3.one, Vector3.zero);
+        }
+
+        // A dais under the Collector so the boss reads as the arena's focus.
+        Cylinder(root, "CollectorDais", new Vector3(0f, 0.15f, 8f), new Vector3(3.2f, 0.15f, 3.2f), marble);
+
+        // Readability of the gameplay pieces.
+        Recolor("Collector", collectorMat);
+        RecolorChild("Collector", "Shield", shieldMat);
+        Recolor("TimeWarden", warden);
+        Recolor("ChronologicalShadow", shadowMat);
+        RecolorChild("TimeAnchor_EastWing", "LensVisual", lensGlow);
+        RecolorChild("TimeAnchor_WestWing", "LensVisual", lensGlow);
+
+        Save(scene);
+    }
+
+    // -----------------------------------------------------------------
+    // Building blocks
+    // -----------------------------------------------------------------
+
+    private static void BuildBuilding(GameObject root, Terrain terrain, Vector3 flat, float width, float height, float depth)
+    {
+        float groundY = TerrainHeight(terrain, flat);
+        var body = Cube(root, "Building", new Vector3(flat.x, groundY + height / 2f, flat.z),
+                        new Vector3(width, height, depth), Vector3.zero, plaster, false);
+        Cube(root, "Roof", body.transform.position + new Vector3(0f, height / 2f + 0.3f, 0f),
+             new Vector3(width + 0.4f, 0.6f, depth + 0.4f), Vector3.zero, roof, false);
+    }
+
+    private static void BuildLantern(GameObject root, Vector3 pos)
+    {
+        Cube(root, "LanternPost", pos + new Vector3(0f, 1.1f, 0f),
+             new Vector3(0.12f, 2.2f, 0.12f), Vector3.zero, roof, false);
+        GameObject lamp = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        lamp.name = "LanternLamp";
+        StripColliders(lamp);
+        lamp.transform.SetParent(root.transform, false);
+        lamp.transform.position = pos + new Vector3(0f, 2.3f, 0f);
+        lamp.transform.localScale = Vector3.one * 0.35f;
+        lamp.GetComponent<MeshRenderer>().sharedMaterial = lensGlow;
+    }
+
+    // -----------------------------------------------------------------
+    // Primitive / prefab helpers
+    // -----------------------------------------------------------------
+
+    private static GameObject Cube(GameObject root, string name, Vector3 pos, Vector3 scale, Vector3 euler, Material mat, bool collide)
+    {
+        GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        go.name = name;
+        if (!collide) { StripColliders(go); }
+        go.transform.SetParent(root.transform, false);
+        go.transform.position = pos;
+        go.transform.localScale = scale;
+        go.transform.rotation = Quaternion.Euler(euler);
+        if (mat != null) { go.GetComponent<MeshRenderer>().sharedMaterial = mat; }
+        return go;
+    }
+
+    private static void Cylinder(GameObject root, string name, Vector3 pos, Vector3 scale, Material mat)
+    {
+        GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        go.name = name;
+        StripColliders(go);
+        go.transform.SetParent(root.transform, false);
+        go.transform.position = pos;
+        go.transform.localScale = scale;
+        if (mat != null) { go.GetComponent<MeshRenderer>().sharedMaterial = mat; }
+    }
+
+    private static void Prop(string prefabPath, GameObject root, Vector3 pos, Vector3 scale, Vector3 euler)
+    {
+        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+        if (prefab == null)
+        {
+            return;
+        }
+
+        var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+        go.transform.SetParent(root.transform, true);
+        go.transform.position = pos;
+        go.transform.localScale = scale;
+        go.transform.rotation = Quaternion.Euler(euler);
+        StripColliders(go);
+    }
+
+    private static void StripColliders(GameObject go)
+    {
+        foreach (Collider c in go.GetComponentsInChildren<Collider>(true))
+        {
+            Object.DestroyImmediate(c);
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Cosmetic recolour of existing objects (no logic change)
+    // -----------------------------------------------------------------
+
+    private static void Recolor(string objectName, Material mat)
+    {
+        GameObject go = GameObject.Find(objectName);
+        if (go == null || mat == null)
+        {
+            return;
+        }
+
+        foreach (MeshRenderer r in go.GetComponentsInChildren<MeshRenderer>(true))
+        {
+            r.sharedMaterial = mat;
+        }
+    }
+
+    private static void RecolorChild(string parentName, string childName, Material mat)
+    {
+        GameObject parent = GameObject.Find(parentName);
+        if (parent == null || mat == null)
+        {
+            return;
+        }
+
+        Transform child = parent.transform.Find(childName);
+        if (child == null)
+        {
+            return;
+        }
+
+        foreach (MeshRenderer r in child.GetComponentsInChildren<MeshRenderer>(true))
+        {
+            r.sharedMaterial = mat;
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Terrain / scene plumbing
+    // -----------------------------------------------------------------
+
+    private static Vector3 OnTerrain(Terrain terrain, Vector3 flat)
+    {
+        return new Vector3(flat.x, TerrainHeight(terrain, flat), flat.z);
+    }
+
+    private static float TerrainHeight(Terrain terrain, Vector3 flat)
+    {
+        return terrain == null ? flat.y : terrain.transform.position.y + terrain.SampleHeight(flat);
+    }
+
+    private static GameObject FreshRoot()
+    {
+        GameObject root = GameObject.Find(DressingRoot);
+        if (root != null)
+        {
+            Object.DestroyImmediate(root);
+        }
+
+        return new GameObject(DressingRoot);
+    }
+
+    private static void Save(Scene scene)
+    {
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+    }
+}

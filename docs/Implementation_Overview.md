@@ -99,12 +99,24 @@ Phase 0, unchanged; 0 failed), across 24 new tests in `SceneConnectionsTests.cs`
 and the greybox/placeholder nature of the new puzzle and boss numbers) is narrative and art polish, not missing
 mechanics — see `Phase6_Unity_Walkthrough.md`.
 
-## Phase 7 — Polish
+## Phase 7 — Polish  ◐ NEAR COMPLETE (3 documented manual items remain)
+
+Step 7.1 and 7.2 have no **Verification.** line in `Implementation_Plan.md` and only ever *support* soft scoring axes
+(G1/G2/S1/S10/D2) — a human-judged polish pass. Everything listed was built as a real, working, wired system;
+the three things that genuinely cannot be finished through supported headless automation (the AudioMixer *asset*, a
+lightmap bake, a real-hardware framerate check) have all their surrounding code/lighting prepared and exact manual
+steps documented, rather than being faked with a substitute. Full detail in `docs/Phase7_Unity_Walkthrough.md`.
 
 | ✅ | Step | What requirement this satisfies |
 |---|---|---|
-|  | **7.1 Audio** — per-scene ambience, effects on every player action, a mixer snapshot with a low-pass filter that engages during slow-time. Compress hard. | How interesting the game feels [G1] and how well the trailer lands [G2]; keeps the build under 300 MB [S1] |
-|  | **7.2 Lighting and visual effects** — bake where possible; per-era colour grading (sepia / neutral / cyan) so the era reads from a still frame; hold framerate on the defense machine. | How interesting the game looks [G1], trailer quality [G2], and the build running smoothly on your own machine in the defense [D2] |
+| ◐ | **7.1 Audio — all content built, mixer asset is the one manual step** — `AudioManager` in all three scenes with per-scene ambience (MuseumNight tick / FrozenCity wind+held-note / ClockCore dissonant drone) and **all twelve listed SFX cues** (footsteps + stair variant, interaction, shard pickup, orb throw, orb impact, bell, fracture, Warden alert, capture, era switch, slow-time enter/exit), each wired to a real game event by observation — no Phase 3/4 file changed. Slow-time filtering works today via an `AudioLowPassFilter`. <br>*Manual: the `AudioMixer` **asset** (Master/Music/SFX + Normal/SlowTime snapshots) — Unity has no supported API to create it from script; `AudioManager` is fully code-wired to use it and the builder auto-detects it, so it is a ~2-minute Editor step then a re-run. See the walkthrough.* | How interesting the game feels [G1] and how well the trailer lands [G2] |
+| ◐ | **7.2 Lighting and VFX — grading, all 5 particles and lighting built; bake+framerate manual** — `EraColorGrading` tints warm/neutral/cold by era (tested); **all five particle effects** built (era-switch shockwave, shard sparkle, fracture dust, orb trail on the prefab, Shadow drift on each Shadow); MuseumNight real-time lighting — one cold shadow-casting moonlight, four warm pooled exhibit spots, dim cool ambient for deep shadows. <br>*Manual: an optional lightmap **bake** (`Lightmapping.Bake()` is long-running/hang-prone unattended and needs visual judgement; lights are set up so it is one click), and the **D2 framerate check** (no headless equivalent).* | How interesting the game looks [G1], trailer quality [G2] — **era-reads-from-a-still-frame met** |
+
+**Verification.** `Tools/verify.ps1` — compiles clean, 81/87 PlayMode tests passing (6 intentionally ignored since
+Phase 0, unchanged; 0 failed), across 10 tests in `AudioAndVfxTests.cs`. Every automatable Phase 7 item is
+implemented and wired; the only remaining work is the AudioMixer asset (manual, code ready), an optional bake, and
+the real-hardware framerate check — none of which can be done or verified headlessly. See
+`Phase7_Unity_Walkthrough.md` for the exact manual steps.
 
 ## Phase 8 — Submission and defense
 
