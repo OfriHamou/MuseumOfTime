@@ -8,6 +8,7 @@ using UnityEngine;
 /// worlds. That is far cheaper and reads identically to the player, who only
 /// ever sees one at a time.
 /// </summary>
+[DefaultExecutionOrder(-90)]
 public sealed class EraManager : MonoBehaviour
 {
     public static EraManager Instance { get; private set; }

@@ -32,6 +32,31 @@ public static class ClockCoreContentBuilder
 
     public static void BuildFromCommandLine() { Build(); }
 
+    /// <summary>
+    /// Reapplies only the player/camera setup (Noa model+avatar via the
+    /// Player prefab, plus the approved third-person framing) without
+    /// touching anything else already in the scene - for reconciling after a
+    /// rebase/merge brought in newer scene content that predates this step.
+    /// </summary>
+    [MenuItem("Museum of Time/Reapply Player And Cameras Only (ClockCore)")]
+    public static void BuildPlayerAndCamerasOnlyMenu() { BuildPlayerAndCamerasOnly(); }
+
+    public static void BuildPlayerAndCamerasOnly()
+    {
+        Scene scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+
+        GameObject player = BuildPlayerAndCameras();
+        if (player == null)
+        {
+            return;
+        }
+
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+
+        Debug.Log("CLOCKCORE OK: player and cameras reapplied (nothing else touched).");
+    }
+
     private static void Build()
     {
         Scene scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
