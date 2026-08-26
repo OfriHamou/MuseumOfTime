@@ -17,6 +17,28 @@ public sealed class SceneLoader : MonoBehaviour
         LoadScene("MuseumNight");
     }
 
+    /// <summary>
+    /// Loads the serialized save from Step 3.9 and resumes at whichever scene
+    /// it was written from, falling back to MuseumNight for a save that
+    /// predates the checkpoint fields.
+    /// </summary>
+    public void ContinueGame()
+    {
+        if (!SaveService.Load())
+        {
+            Debug.LogWarning("No save to continue from.", this);
+            return;
+        }
+
+        GameState state = GameManager.Instance.State;
+
+        string target = state.hasCheckpoint && !string.IsNullOrWhiteSpace(state.checkpointSceneName)
+            ? state.checkpointSceneName
+            : "MuseumNight";
+
+        LoadScene(target);
+    }
+
     public void LoadScene(string sceneName)
     {
         if (string.IsNullOrWhiteSpace(sceneName))
