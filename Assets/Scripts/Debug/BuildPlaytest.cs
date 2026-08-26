@@ -929,33 +929,60 @@ public sealed class BuildPlaytest : MonoBehaviour
             route != null && route.Count >= 2,
             route == null ? "no PatrolRoute" : route.Count + " waypoints");
 
+        // Seeing it paused is not enough on its own: an agent that never
+        // moves at all is "paused" every time you look. It has to be caught
+        // both stopped AND walking, and to have actually covered ground.
         bool sawPause = false;
+        bool sawMoving = false;
         float watched = 0f;
 
-        while (watched < 14f && !sawPause)
+        Vector3 wardenStart = warden.transform.position;
+        float furthest = 0f;
+
+        // Watch for a fixed window rather than stopping at the first sign of
+        // each: an early exit measured almost no distance and proved nothing.
+        while (watched < 16f)
         {
             if (warden.IsPaused)
             {
                 sawPause = true;
             }
+            else if (wardenAgent.velocity.magnitude > 0.3f)
+            {
+                sawMoving = true;
+            }
+
+            furthest = Mathf.Max(furthest,
+                Vector3.Distance(wardenStart, warden.transform.position));
 
             watched += Time.deltaTime;
             yield return null;
         }
 
         Check(
-            "the warden pauses on patrol",
-            sawPause,
-            sawPause
-                ? "caught it stopped and scanning after " +
-                  watched.ToString("0.0") + "s"
-                : "never paused in " + watched.ToString("0.0") + "s");
+            "the warden patrols AND pauses",
+            sawPause && sawMoving && furthest > 2f,
+            "paused=" + sawPause + " walked=" + sawMoving +
+            ", covered " + furthest.ToString("0.0") + "m in " +
+            watched.ToString("0.0") + "s");
 
         // ---- the LayerMask is real and built in code ----
+        // A mask of 1 means only Default resolved, which is what happens when
+        // a layer name does not exist: GetMask ignores it without warning.
+        int maskBits = 0;
+        for (int bit = 0; bit < 32; bit++)
+        {
+            if ((warden.VisionBlockers.value & (1 << bit)) != 0)
+            {
+                maskBits++;
+            }
+        }
+
         Check(
-            "vision uses a LayerMask built in code",
-            warden.VisionBlockers.value != 0,
-            "mask value " + warden.VisionBlockers.value);
+            "vision uses a LayerMask built in code from real layers",
+            maskBits >= 2,
+            "mask value " + warden.VisionBlockers.value + " covering " +
+            maskBits + " layers");
 
         // ---- freezing, which is how the orb creates a stealth opening ----
         warden.Freeze(2f);
