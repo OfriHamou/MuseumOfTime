@@ -44,6 +44,8 @@ public static class NavigationBuilder
     {
         Scene scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
 
+        RemoveOrphanAgentTypes();
+
         int wardenId = EnsureAgentType(
             WardenAgentName, radius: 0.5f, height: 2.0f, climb: 0.4f, slope: 45f);
 
@@ -77,9 +79,8 @@ public static class NavigationBuilder
         EditorSceneManager.SaveScene(scene);
 
         Debug.Log(
-            "NAV OK: agent types " + WardenAgentName + "(id " + wardenId +
-            ") and " + ShadowAgentName + "(id " + shadowId + "), " +
-            "two NavMeshSurfaces baked separately.");
+            "NAV OK: " + Describe(wardenId) + " | " + Describe(shadowId) +
+            " | two NavMeshSurfaces baked separately.");
     }
 
     // -----------------------------------------------------------------
@@ -87,89 +88,165 @@ public static class NavigationBuilder
     // -----------------------------------------------------------------
 
     /// <summary>
-    /// Finds an agent type by name, or creates one. Unity keeps these in
-    /// ProjectSettings, and the name has to be written through the serialised
-    /// settings object because there is no public setter for it.
+    /// Finds an agent type by name, or creates one, and writes its dimensions
+    /// IN PLACE.
+    ///
+    /// The obvious approach - RemoveSettings then CreateSettings - does not
+    /// work: it mints a fresh agentTypeID every run, orphans the old entry,
+    /// and leaves agents in the scene pointing at ids that no longer exist.
+    /// Unity has no public setter for these fields, so the settings object has
+    /// to be edited through SerializedObject instead.
     /// </summary>
     private static int EnsureAgentType(
         string name, float radius, float height, float climb, float slope)
     {
-        for (int i = 0; i < NavMesh.GetSettingsCount(); i++)
-        {
-            NavMeshBuildSettings existing = NavMesh.GetSettingsByIndex(i);
+        Object asset = Unsupported.GetSerializedAssetInterfaceSingleton(
+            "NavMeshProjectSettings");
 
-            if (NavMesh.GetSettingsNameFromID(existing.agentTypeID) == name)
-            {
-                Apply(existing.agentTypeID, radius, height, climb, slope);
-                return existing.agentTypeID;
-            }
+        if (asset == null)
+        {
+            Debug.LogError("NAV FAILED: cannot reach NavMeshProjectSettings.");
+            return -1;
         }
 
-        NavMeshBuildSettings created = NavMesh.CreateSettings();
-        Apply(created.agentTypeID, radius, height, climb, slope);
-        Rename(created.agentTypeID, name);
-        return created.agentTypeID;
+        var so = new SerializedObject(asset);
+        SerializedProperty settings = so.FindProperty("m_Settings");
+        SerializedProperty names = so.FindProperty("m_SettingNames");
+
+        int index = IndexOfName(names, name);
+
+        if (index < 0)
+        {
+            // CreateSettings appends a new entry with a valid unique id; the
+            // dimensions are then written onto that entry rather than by
+            // replacing it.
+            NavMeshBuildSettings created = NavMesh.CreateSettings();
+            so.Update();
+
+            index = IndexOfAgentTypeId(settings, created.agentTypeID);
+
+            if (index < 0)
+            {
+                Debug.LogError("NAV FAILED: new agent type " + name +
+                               " did not appear in the settings list.");
+                return -1;
+            }
+
+            if (names.arraySize <= index)
+            {
+                names.arraySize = index + 1;
+            }
+
+            names.GetArrayElementAtIndex(index).stringValue = name;
+        }
+
+        SerializedProperty entry = settings.GetArrayElementAtIndex(index);
+        entry.FindPropertyRelative("agentRadius").floatValue = radius;
+        entry.FindPropertyRelative("agentHeight").floatValue = height;
+        entry.FindPropertyRelative("agentClimb").floatValue = climb;
+        entry.FindPropertyRelative("agentSlope").floatValue = slope;
+
+        so.ApplyModifiedPropertiesWithoutUndo();
+
+        return entry.FindPropertyRelative("agentTypeID").intValue;
     }
 
-    private static void Apply(
-        int agentTypeId, float radius, float height, float climb, float slope)
+    /// <summary>
+    /// Deletes agent types left behind by an earlier failed attempt, so the
+    /// project settings do not accumulate junk on every run.
+    /// </summary>
+    private static void RemoveOrphanAgentTypes()
     {
-        for (int i = 0; i < NavMesh.GetSettingsCount(); i++)
-        {
-            NavMeshBuildSettings settings = NavMesh.GetSettingsByIndex(i);
+        Object asset = Unsupported.GetSerializedAssetInterfaceSingleton(
+            "NavMeshProjectSettings");
 
-            if (settings.agentTypeID != agentTypeId)
+        if (asset == null)
+        {
+            return;
+        }
+
+        var so = new SerializedObject(asset);
+        SerializedProperty settings = so.FindProperty("m_Settings");
+        SerializedProperty names = so.FindProperty("m_SettingNames");
+
+        bool changed = false;
+
+        for (int i = names.arraySize - 1; i >= 0; i--)
+        {
+            string entryName = names.GetArrayElementAtIndex(i).stringValue;
+
+            // Humanoid is Unity's built-in and must stay. Anything still
+            // called "New Agent" is debris from a previous run.
+            if (!entryName.StartsWith("New Agent"))
             {
                 continue;
             }
 
-            settings.agentRadius = radius;
-            settings.agentHeight = height;
-            settings.agentClimb = climb;
-            settings.agentSlope = slope;
+            names.DeleteArrayElementAtIndex(i);
 
-            // Writing the struct back is what actually saves it.
-            NavMesh.RemoveSettings(agentTypeId);
-            NavMeshBuildSettings replacement = NavMesh.CreateSettings();
-            replacement.agentRadius = radius;
-            replacement.agentHeight = height;
-            replacement.agentClimb = climb;
-            replacement.agentSlope = slope;
-            return;
+            if (i < settings.arraySize)
+            {
+                settings.DeleteArrayElementAtIndex(i);
+            }
+
+            changed = true;
+        }
+
+        if (changed)
+        {
+            so.ApplyModifiedPropertiesWithoutUndo();
+            Debug.Log("NAV: removed orphaned agent types from a previous run.");
         }
     }
 
-    private static void Rename(int agentTypeId, string name)
+    private static int IndexOfName(SerializedProperty names, string name)
     {
-        Object settingsAsset = Unsupported.GetSerializedAssetInterfaceSingleton(
-            "NavMeshProjectSettings");
-
-        if (settingsAsset == null)
+        for (int i = 0; i < names.arraySize; i++)
         {
-            return;
-        }
-
-        var so = new SerializedObject(settingsAsset);
-        SerializedProperty list = so.FindProperty("m_Settings");
-        SerializedProperty names = so.FindProperty("m_SettingNames");
-
-        if (list == null || names == null)
-        {
-            return;
-        }
-
-        for (int i = 0; i < list.arraySize; i++)
-        {
-            SerializedProperty entry = list.GetArrayElementAtIndex(i);
-            SerializedProperty id = entry.FindPropertyRelative("agentTypeID");
-
-            if (id != null && id.intValue == agentTypeId && i < names.arraySize)
+            if (names.GetArrayElementAtIndex(i).stringValue == name)
             {
-                names.GetArrayElementAtIndex(i).stringValue = name;
-                so.ApplyModifiedPropertiesWithoutUndo();
-                return;
+                return i;
             }
         }
+
+        return -1;
+    }
+
+    private static int IndexOfAgentTypeId(SerializedProperty settings, int id)
+    {
+        for (int i = 0; i < settings.arraySize; i++)
+        {
+            SerializedProperty entry = settings.GetArrayElementAtIndex(i);
+
+            if (entry.FindPropertyRelative("agentTypeID").intValue == id)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    /// <summary>Reads back what is actually stored, not what we asked for.</summary>
+    private static string Describe(int agentTypeId)
+    {
+        for (int i = 0; i < NavMesh.GetSettingsCount(); i++)
+        {
+            NavMeshBuildSettings s = NavMesh.GetSettingsByIndex(i);
+
+            if (s.agentTypeID != agentTypeId)
+            {
+                continue;
+            }
+
+            return NavMesh.GetSettingsNameFromID(agentTypeId) +
+                   "(id " + agentTypeId +
+                   " r=" + s.agentRadius.ToString("0.00") +
+                   " h=" + s.agentHeight.ToString("0.0") +
+                   " climb=" + s.agentClimb.ToString("0.00") + ")";
+        }
+
+        return "MISSING(id " + agentTypeId + ")";
     }
 
     // -----------------------------------------------------------------

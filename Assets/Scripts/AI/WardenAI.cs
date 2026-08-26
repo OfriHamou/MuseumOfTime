@@ -77,9 +77,15 @@ public sealed class WardenAI : MonoBehaviour, IFreezable
         agent = GetComponent<NavMeshAgent>();
         route = GetComponent<PatrolRoute>();
 
-        // The layer mask, built in code. "HideVolume" is the set of display
-        // cases and pillars Noa can break line of sight behind.
-        visionBlockers = LayerMask.GetMask("Default", "HideVolume");
+        // The layer mask, built in code. StealthCover is the project's layer
+        // for display cases and pillars Noa can break line of sight behind;
+        // Obstacle is solid world geometry.
+        //
+        // Note the failure mode: LayerMask.GetMask silently ignores a name
+        // that does not exist. An earlier version asked for "HideVolume",
+        // which this project does not define, and the mask quietly collapsed
+        // to Default alone - the stealth cover did nothing and nothing warned.
+        visionBlockers = LayerMask.GetMask("Default", "Obstacle", "StealthCover");
     }
 
     private void Start()

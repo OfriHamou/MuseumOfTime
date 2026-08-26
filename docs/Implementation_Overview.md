@@ -46,16 +46,16 @@ One line per step, in build order. The right column says which assignment requir
 | ✅ | **3.8 Time Anchors — hidden teleports** — at least two each in FrozenCity and ClockCore only; invisible without the Time Lens; failure returns Noa to the last anchor with health refreshed and a score penalty. | **From scene 2 onward, two hidden teleports; on failure the player returns to the teleport rather than the start, with health restored** [T21] |
 | ✅ | **3.9 Cross-scene persistence and the two items** — JSON save/load; Time Lens granted in scene 1 and *required* in scene 2, Chrono Hourglass granted in scene 2 and *required* in scene 3. | **Serialized data passed between scenes, including two acquired items** [T9]; makes the three scenes one connected game [S9] |
 
-## Phase 4 — AI, navigation, stealth
+## Phase 4 — AI, navigation, stealth  ✅ COMPLETE
 
 | ✅ | Step | What requirement this satisfies |
 |---|---|---|
-|  | **4.1 Two agent types, separate bakes** — `WardenAgent` and `ShadowAgent`, two `NavMeshSurface` components baked separately, with a Shadow-only area so the two genuinely travel different routes. Unity's NavMesh bake *is* Recast. | **Pathfinding with two agent types on different routes, each with its own bake** [T13]; **the Recast navmesh half of the stealth requirement** [T16] |
-|  | **4.2 Warden patrol with pause** — a waypoint route with a per-point wait; the Warden fully stops and scans for 2–4 seconds. The pause is the graded part. | **Patrol with pause** [T7] |
-|  | **4.3 Vision, layer mask, stealth** — range, then cone angle, then a line-of-sight raycast against a mask **written in code**; hide volumes, a detection meter, capture when it fills. | **Stealth working against the navmesh** [T16]; **a LayerMask defined in code rather than the inspector** [T17] |
-|  | **4.4 Steering behaviours** — explicit pursue (aims at predicted position), seek and flee, named so they are obvious in a code review. | **A clear AI steering element — seek, flee or pursue** [T13] |
-|  | **4.5 Chronological Shadow** — the second agent type as a real character: crosses ledges Wardens cannot, steals Time Shards, recoverable by freezing it. | Makes the two agent types genuinely different [T13]; gives score a real way to be lost [T8] |
-|  | **4.6 Enemy Animator** — hand-author `WardenController` with Patrol / Alert / Chase / Attack (+ Frozen), driven by the detection meter. | **An Animator you defined yourself, with at least 4 states** [T14] |
+| ✅ | **4.1 Two agent types, separate bakes** — `WardenAgent` and `ShadowAgent`, two `NavMeshSurface` components baked separately, with a Shadow-only area so the two genuinely travel different routes. Unity's NavMesh bake *is* Recast. | **Pathfinding with two agent types on different routes, each with its own bake** [T13]; **the Recast navmesh half of the stealth requirement** [T16] |
+| ✅ | **4.2 Warden patrol with pause** — a waypoint route with a per-point wait; the Warden fully stops and scans for 2–4 seconds. The pause is the graded part. | **Patrol with pause** [T7] |
+| ✅ | **4.3 Vision, layer mask, stealth** — range, then cone angle, then a line-of-sight raycast against a mask **written in code**; hide volumes, a detection meter, capture when it fills. | **Stealth working against the navmesh** [T16]; **a LayerMask defined in code rather than the inspector** [T17] |
+| ✅ | **4.4 Steering behaviours** — explicit pursue (aims at predicted position), seek and flee, named so they are obvious in a code review. | **A clear AI steering element — seek, flee or pursue** [T13] |
+| ✅ | **4.5 Chronological Shadow** — the second agent type as a real character: crosses ledges Wardens cannot, steals Time Shards, recoverable by freezing it. | Makes the two agent types genuinely different [T13]; gives score a real way to be lost [T8] |
+| ✅ | **4.6 Enemy Animator** — hand-author `WardenController` with Patrol / Alert / Chase / Attack (+ Frozen), driven by the detection meter. | **An Animator you defined yourself, with at least 4 states** [T14] |
 
 ## Phase 5 — UI and readability
 
