@@ -34,6 +34,38 @@ public static class FrozenCityContentBuilder
 
     public static void BuildFromCommandLine() { Build(); }
 
+    /// <summary>
+    /// Reapplies only the player/camera setup (Noa model+avatar via the
+    /// Player prefab, plus the approved third-person framing) without
+    /// touching anything else already in the scene - for reconciling after a
+    /// rebase/merge brought in newer scene content that predates this step.
+    /// </summary>
+    [MenuItem("Museum of Time/Reapply Player And Cameras Only (FrozenCity)")]
+    public static void BuildPlayerAndCamerasOnlyMenu() { BuildPlayerAndCamerasOnly(); }
+
+    public static void BuildPlayerAndCamerasOnly()
+    {
+        Scene scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+
+        Terrain terrain = Terrain.activeTerrain;
+        if (terrain == null)
+        {
+            Debug.LogError("FROZENCITY FAILED: no Terrain in the scene.");
+            return;
+        }
+
+        GameObject player = BuildPlayerAndCameras(terrain);
+        if (player == null)
+        {
+            return;
+        }
+
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+
+        Debug.Log("FROZENCITY OK: player and cameras reapplied (nothing else touched).");
+    }
+
     private static void Build()
     {
         Scene scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
