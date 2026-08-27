@@ -235,7 +235,18 @@ public static class ClockCoreContentBuilder
         eraSo.ApplyModifiedPropertiesWithoutUndo();
 
         GameObject respawnObject = FindOrCreate("RespawnService", null);
-        Ensure<RespawnService>(respawnObject);
+        RespawnService respawn = Ensure<RespawnService>(respawnObject);
+
+        // Falls back here only if the player dies before arming either Time
+        // Anchor - must point at the actual spawn, not the RespawnService
+        // default (world origin).
+        GameObject spawnMarker = GameObject.Find("PlayerSpawn");
+        if (spawnMarker != null)
+        {
+            var respawnSo = new SerializedObject(respawn);
+            respawnSo.FindProperty("sceneStart").objectReferenceValue = spawnMarker.transform;
+            respawnSo.ApplyModifiedPropertiesWithoutUndo();
+        }
     }
 
     private static int BuildAnchors()

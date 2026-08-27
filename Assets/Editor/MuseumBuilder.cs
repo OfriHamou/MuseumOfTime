@@ -101,7 +101,7 @@ public static class MuseumBuilder
 
         marble = MakeMaterial(
             "MuseumMarble",
-            Checker(new Color(0.86f, 0.85f, 0.82f), new Color(0.74f, 0.73f, 0.71f), 8),
+            Marble(new Color(0.90f, 0.89f, 0.86f), new Color(0.55f, 0.56f, 0.58f)),
             new Vector2(6f, 4f),
             smoothness: 0.65f);
 
@@ -159,22 +159,40 @@ public static class MuseumBuilder
         return AssetDatabase.LoadAssetAtPath<Material>(matPath);
     }
 
-    private static Texture2D Checker(Color a, Color b, int squares)
+    /// <summary>
+    /// Classic turbulence-marble: layered Perlin noise warps a sine-wave
+    /// banding pattern into organic veins, instead of the flat checkerboard
+    /// this used to be (which read as an unfinished placeholder, not stone).
+    /// </summary>
+    private static Texture2D Marble(Color baseColor, Color veinColor)
     {
         const int size = 256;
         var tex = new Texture2D(size, size);
-        int cell = size / squares;
 
         for (int y = 0; y < size; y++)
         {
             for (int x = 0; x < size; x++)
             {
-                bool even = ((x / cell) + (y / cell)) % 2 == 0;
-                Color c = even ? a : b;
+                float turbulence = 0f;
+                float freq = 0.015f;
+                float amp = 1f;
 
-                // A little grain stops it reading as flat plastic.
-                float grain = Mathf.PerlinNoise(x * 0.08f, y * 0.08f) * 0.05f;
-                tex.SetPixel(x, y, c * (0.97f + grain));
+                for (int octave = 0; octave < 4; octave++)
+                {
+                    turbulence += Mathf.PerlinNoise(x * freq, y * freq) * amp;
+                    freq *= 2.1f;
+                    amp *= 0.5f;
+                }
+
+                float vein = Mathf.Sin((x + y) * 0.045f + turbulence * 6f);
+                float t = Mathf.Clamp01(Mathf.Abs(vein));
+                // Sharpen so veins read as thin lines rather than a broad blend.
+                t = Mathf.Pow(t, 4f);
+
+                Color c = Color.Lerp(veinColor, baseColor, t);
+
+                float grain = Mathf.PerlinNoise(x * 0.2f, y * 0.2f) * 0.04f;
+                tex.SetPixel(x, y, c * (0.98f + grain));
             }
         }
 

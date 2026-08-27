@@ -61,7 +61,17 @@ public static class CoreSystemsBuilder
         eraSo.ApplyModifiedPropertiesWithoutUndo();
 
         GameObject respawnObject = FindOrCreate("RespawnService", managers);
-        Ensure<RespawnService>(respawnObject);
+        RespawnService respawn = Ensure<RespawnService>(respawnObject);
+
+        // A fixed marker, not the player's own (moving) transform - MuseumNight
+        // never has a Time Anchor (T21 forbids one here), so a death here
+        // always falls back to sceneStart, which must point somewhere real.
+        GameObject sceneStartMarker = FindOrCreate("SceneStart", managers);
+        sceneStartMarker.transform.position = player.transform.position;
+
+        var respawnSo = new SerializedObject(respawn);
+        respawnSo.FindProperty("sceneStart").objectReferenceValue = sceneStartMarker.transform;
+        respawnSo.ApplyModifiedPropertiesWithoutUndo();
 
         // ---- Triggers -----------------------------------------------------
         GameObject triggers = FindOrCreate("Triggers", null);
