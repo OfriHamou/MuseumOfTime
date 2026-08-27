@@ -122,9 +122,9 @@ public sealed class WardenCaptureTests
         var controller = player.GetComponent<CharacterController>();
         var agent = warden.GetComponent<NavMeshAgent>();
 
-        float until = Time.time + seconds;
+        float until = Time.unscaledTime + seconds;
 
-        while (Time.time < until)
+        while (Time.unscaledTime < until)
         {
             PlaceWardenOnPlayer(agent);
 
@@ -159,9 +159,9 @@ public sealed class WardenCaptureTests
 
         yield return StageACapture();
 
-        float deadline = Time.time + 5f;
+        float deadline = Time.unscaledTime + 5f;
 
-        while (warden.CaptureCount == 0 && Time.time < deadline)
+        while (warden.CaptureCount == 0 && Time.unscaledTime < deadline)
         {
             yield return null;
         }
@@ -191,9 +191,9 @@ public sealed class WardenCaptureTests
     {
         yield return StageACapture();
 
-        float deadline = Time.time + 5f;
+        float deadline = Time.unscaledTime + 5f;
 
-        while (warden.CaptureCount == 0 && Time.time < deadline)
+        while (warden.CaptureCount == 0 && Time.unscaledTime < deadline)
         {
             yield return null;
         }
@@ -227,12 +227,12 @@ public sealed class WardenCaptureTests
 
         // Long enough to span two five second cooldowns with margin, while
         // keeping the player cornered so captures actually keep coming.
-        float giveUp = Time.time + 30f;
+        float giveUp = Time.unscaledTime + 30f;
 
         var controller = player.GetComponent<CharacterController>();
         var agent = warden.GetComponent<NavMeshAgent>();
 
-        while (Time.time < giveUp)
+        while (Time.unscaledTime < giveUp)
         {
             PlaceWardenOnPlayer(agent);
 
@@ -251,7 +251,7 @@ public sealed class WardenCaptureTests
                 continue;
             }
 
-            float gap = Time.time - firstSeenAt;
+            float gap = Time.unscaledTime - firstSeenAt;
 
             Assert.Greater(
                 gap, 2.5f,
@@ -323,10 +323,10 @@ public sealed class WardenCaptureTests
         yield return StageACapture();
 
         // Long enough for many captures at a five second cooldown.
-        float until = Time.time + 40f;
+        float until = Time.unscaledTime + 40f;
         var pin = PinWardenToPlayer(40f);
 
-        while (Time.time < until)
+        while (Time.unscaledTime < until)
         {
             pin.MoveNext();
 
@@ -358,5 +358,52 @@ public sealed class WardenCaptureTests
             GameManager.Instance.State.currentHealth,
             Mathf.CeilToInt(GameManager.Instance.State.maxHealth * 0.2f),
             "Health fell below the floor a Warden is allowed to take it to.");
+    }
+
+    /// <summary>
+    /// A chase must end, and the Warden must never stand inside the player.
+    ///
+    /// Both were broken at once. NavMeshAgent.stoppingDistance was left at
+    /// zero, so the agent's destination was the player's exact position, and
+    /// the Warden has no collider to stop it arriving there - it stood inside
+    /// Noa. And nothing ever ended a chase while it could still see her, with
+    /// a chase speed of 4.6 against a walk speed of 4, so no amount of walking
+    /// or turning got away from it. It read as being permanently stuck to the
+    /// player.
+    /// </summary>
+    [UnityTest]
+    public IEnumerator AChaseEndsAndTheWardenKeepsItsDistance()
+    {
+        yield return StageACapture();
+
+        Assert.AreEqual(
+            WardenAI.State.Chase, warden.CurrentState,
+            "The Warden should be chasing at this point.");
+
+        // Stop steering it and let the player stand still in the open. The
+        // chase must end on its own within the patience window.
+        float giveUp = Time.unscaledTime + 25f;
+        float closest = float.MaxValue;
+
+        while (Time.unscaledTime < giveUp &&
+               warden.CurrentState == WardenAI.State.Chase)
+        {
+            Vector3 gap = warden.transform.position - player.transform.position;
+            gap.y = 0f;
+            closest = Mathf.Min(closest, gap.magnitude);
+
+            yield return null;
+        }
+
+        Assert.AreNotEqual(
+            WardenAI.State.Chase, warden.CurrentState,
+            "The Warden chased for over twenty seconds without ever giving " +
+            "up. With no limit on a pursuit it follows the player forever, " +
+            "and it is faster than walking, so there is no way to escape it.");
+
+        Assert.Greater(
+            closest, 0.6f,
+            "The Warden closed to " + closest.ToString("F2") + " m - it is " +
+            "standing inside the player. stoppingDistance must keep it out.");
     }
 }

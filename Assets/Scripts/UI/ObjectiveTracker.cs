@@ -111,9 +111,13 @@ public sealed class ObjectiveTracker : MonoBehaviour
             return;
         }
 
+        // "Head for the exit" is not a direction either. The exit is a few
+        // metres NORTH of the office you just came out of, on the same
+        // mezzanine, and a player who does not know that goes looking for a
+        // front door on the ground floor.
         Set("Leave the museum",
-            "The Time Lens is yours. Q and R now travel between eras. " +
-            "Head for the exit on the upper floor.");
+            "The lit EXIT is a few steps north of the office, on this same " +
+            "balcony. Walk into it.");
     }
 
     private void EvaluateFrozenCity(GameState state)
@@ -121,7 +125,8 @@ public sealed class ObjectiveTracker : MonoBehaviour
         if (state.hasChronoHourglass)
         {
             Set("Leave for the Clock Core",
-                "The Chrono Hourglass is yours. Find the way out of the city.");
+                "The lit EXIT gate is at the NORTH end of the street, past " +
+                "the clock tower. Walk into it.");
             return;
         }
 

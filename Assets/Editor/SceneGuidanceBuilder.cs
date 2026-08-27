@@ -46,7 +46,119 @@ public static class SceneGuidanceBuilder
         BuildFrozenCity();
         BuildClockCore();
 
+        BuildWaypoints();
+
         Debug.Log("=== SCENE GUIDANCE COMPLETE ===");
+    }
+
+    /// <summary>
+    /// Puts an objective waypoint in every gameplay scene: a pip on the
+    /// minimap and a beam of light standing on the thing itself.
+    ///
+    /// The objective text says what to do and roughly where, which still
+    /// leaves a player searching a building they have never seen. Marking the
+    /// place on the map removes the search.
+    /// </summary>
+    private static void BuildWaypoints()
+    {
+        foreach (string path in new[]
+                 {
+                     "Assets/Scenes/MuseumNight.unity",
+                     "Assets/Scenes/FrozenCity.unity",
+                     "Assets/Scenes/ClockCore.unity",
+                 })
+        {
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(path) == null) { continue; }
+
+            Scene scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
+
+            int minimapLayer = LayerMask.NameToLayer("Minimap");
+
+            GameObject root = Root("ObjectiveWaypoint");
+            var waypoint = Ensure<ObjectiveWaypoint>(root);
+
+            // ---- The minimap pip -------------------------------------------
+            Transform oldPip = root.transform.Find("MinimapPip");
+            if (oldPip != null) { Object.DestroyImmediate(oldPip.gameObject); }
+
+            GameObject pip = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            pip.name = "MinimapPip";
+            pip.transform.SetParent(root.transform, false);
+            pip.transform.localScale = new Vector3(1.6f, 0.2f, 1.6f);
+
+            Object.DestroyImmediate(pip.GetComponent<Collider>());
+
+            if (minimapLayer >= 0) { pip.layer = minimapLayer; }
+
+            pip.GetComponent<MeshRenderer>().sharedMaterial =
+                WaypointMaterial("WaypointPip", new Color(1f, 0.83f, 0.32f));
+
+            // ---- The beam in the world -------------------------------------
+            Transform oldBeam = root.transform.Find("WorldBeacon");
+            if (oldBeam != null) { Object.DestroyImmediate(oldBeam.gameObject); }
+
+            GameObject beam = new GameObject("WorldBeacon");
+            beam.transform.SetParent(root.transform, false);
+
+            GameObject shaft = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            shaft.name = "Shaft";
+            shaft.transform.SetParent(beam.transform, false);
+            shaft.transform.localPosition = new Vector3(0f, 6f, 0f);
+            shaft.transform.localScale = new Vector3(0.35f, 6f, 0.35f);
+
+            Object.DestroyImmediate(shaft.GetComponent<Collider>());
+
+            shaft.GetComponent<MeshRenderer>().sharedMaterial =
+                WaypointMaterial("WaypointBeam", new Color(1f, 0.83f, 0.32f));
+
+            GameObject glow = new GameObject("BeaconGlow");
+            glow.transform.SetParent(beam.transform, false);
+            glow.transform.localPosition = new Vector3(0f, 2f, 0f);
+
+            Light light = glow.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.color = new Color(1f, 0.83f, 0.32f);
+            light.intensity = 6f;
+            light.range = 14f;
+            light.shadows = LightShadows.None;
+
+            var so = new SerializedObject(waypoint);
+            SerializedProperty pipProp = so.FindProperty("minimapPip");
+            SerializedProperty beamProp = so.FindProperty("worldBeacon");
+
+            if (pipProp != null) { pipProp.objectReferenceValue = pip.transform; }
+            if (beamProp != null) { beamProp.objectReferenceValue = beam.transform; }
+
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+
+            Debug.Log("WAYPOINT OK: " + scene.name);
+        }
+    }
+
+    private static Material WaypointMaterial(string name, Color colour)
+    {
+        const string folder = "Assets/Materials/Dressing";
+        string path = folder + "/" + name + ".mat";
+
+        var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+
+        if (mat == null)
+        {
+            mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"))
+            {
+                name = name,
+            };
+
+            AssetDatabase.CreateAsset(mat, path);
+        }
+
+        mat.SetColor("_BaseColor", colour);
+        EditorUtility.SetDirty(mat);
+
+        return mat;
     }
 
     // ------------------------------------------------------------------
@@ -81,6 +193,23 @@ public static class SceneGuidanceBuilder
                  new Vector3(-12.2f, 7.2f, 1.5f),
                  "<color=#FFD98A>CURATOR'S OFFICE</color>\nFollow the mezzanine EAST");
 
+        SealTheFrontDoors();
+
+        // CameraRigParityBuilder only covers scenes 2 and 3, so MuseumNight -
+        // the scene the endless fall was actually reported in - would not have
+        // got a FallGuard from there.
+        GameObject museumPlayer = GameObject.FindWithTag("Player");
+
+        if (museumPlayer != null)
+        {
+            Ensure<FallGuard>(museumPlayer);
+            EditorUtility.SetDirty(museumPlayer);
+        }
+
+        Signpost(signs, "Sign_Exit",
+                 new Vector3(9f, 6.6f, 8.6f),
+                 "<color=#8BE29A>EXIT</color>\nWalk in to leave for the Frozen City");
+
         Signpost(signs, "Sign_OfficeDoor",
                  new Vector3(7.4f, 7.2f, 6.0f),
                  "<color=#FFD98A>CURATOR'S OFFICE</color>\nThe Time Lens is inside");
@@ -90,6 +219,72 @@ public static class SceneGuidanceBuilder
 
         Debug.Log("WAYFINDING OK: MuseumNight signposted (3 signs)");
     }
+
+    /// <summary>
+    /// Closes the museum's front entrance.
+    ///
+    /// The south wall is built as two halves - x -15 to -2 and x 2 to 15 -
+    /// which leaves a four metre doorway in the middle, and the ground floor
+    /// stops at that same line. So walking out of the front entrance stepped
+    /// straight off the edge of the world into an endless fall.
+    ///
+    /// It is the FIRST thing a player tries when the objective says "leave
+    /// the museum". FallGuard now catches the fall, but being caught by a
+    /// safety net is not the same as the door being shut: Noa is a night
+    /// guard locked in for her shift, so the doors being locked is both the
+    /// correct fiction and the thing that points her at the real way out.
+    /// </summary>
+    private static void SealTheFrontDoors()
+    {
+        GameObject root = Root("MuseumStructure");
+
+        Transform existing = root.transform.Find("FrontDoors");
+        if (existing != null) { Object.DestroyImmediate(existing.gameObject); }
+
+        GameObject doors = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        doors.name = "FrontDoors";
+        doors.transform.SetParent(root.transform, false);
+        doors.transform.position = new Vector3(0f, 2.5f, -10f);
+        doors.transform.localScale = new Vector3(4.4f, 5f, 0.4f);
+
+        var wood = AssetDatabase.LoadAssetAtPath<Material>(
+            "Assets/Materials/Museum/MuseumWood.mat");
+
+        if (wood != null)
+        {
+            doors.GetComponent<MeshRenderer>().sharedMaterial = wood;
+        }
+
+        // A lintel above them, so the gap is closed all the way to the
+        // ten metre wall top rather than leaving a hole to jump through.
+        Transform oldLintel = root.transform.Find("FrontDoorLintel");
+        if (oldLintel != null) { Object.DestroyImmediate(oldLintel.gameObject); }
+
+        GameObject lintel = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        lintel.name = "FrontDoorLintel";
+        lintel.transform.SetParent(root.transform, false);
+        lintel.transform.position = new Vector3(0f, 7.5f, -10f);
+        lintel.transform.localScale = new Vector3(4.4f, 5f, 0.4f);
+
+        var plaster = AssetDatabase.LoadAssetAtPath<Material>(
+            "Assets/Materials/Museum/MuseumPlaster.mat");
+
+        if (plaster != null)
+        {
+            lintel.GetComponent<MeshRenderer>().sharedMaterial = plaster;
+        }
+
+        // And say why they will not open.
+        GameObject signs = Root("Wayfinding");
+
+        Signpost(signs, "Sign_FrontDoors",
+                 new Vector3(0f, 2.6f, -8.6f),
+                 "<color=#FF9E7A>MAIN DOORS - LOCKED FOR THE NIGHT</color>" + LineBreak +
+                 "The way out is upstairs, past the curator's office");
+    }
+
+    /// <summary>A literal backslash-n for embedding in signpost copy.</summary>
+    private static readonly string LineBreak = "\n";
 
     /// <summary>
     /// A world-space sign with its own light, so it reads in a dark room.
@@ -191,9 +386,17 @@ public static class SceneGuidanceBuilder
         MakeTrigger<RoomEntryTrigger>(triggers, "Trigger_TowerEntry",
             new Vector3(0f, 1.5f, 26f), new Vector3(10f, 4f, 6f), null);
 
+        // The way out, marked. It sits past the tower at the north end of the
+        // street, which is nowhere a player would think to look unless told.
+        GameObject citySigns = Root("Wayfinding");
+
+        Signpost(citySigns, "Sign_CityExit",
+                 new Vector3(0f, 4.6f, 45f),
+                 "<color=#8BE29A>EXIT</color>\nWalk in to reach the Clock Core");
+
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
-        Debug.Log("GUIDANCE OK: FrozenCity (4 plaques + objective, era zone, tower entry)");
+        Debug.Log("GUIDANCE OK: FrozenCity (4 plaques + objective, era zone, tower entry, exit sign)");
     }
 
     // ------------------------------------------------------------------

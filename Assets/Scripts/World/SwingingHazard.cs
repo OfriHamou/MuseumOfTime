@@ -61,6 +61,7 @@ public sealed class SwingingHazard : MonoBehaviour
 
         if (GameManager.Instance != null)
         {
+            RespawnService.LastCauseOfDeath = "A swinging exhibit struck you.";
             GameManager.Instance.TakeDamage(damage);
         }
 

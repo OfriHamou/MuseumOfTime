@@ -139,6 +139,25 @@ public sealed class PlayerCameraRig : MonoBehaviour
     private static void ResetPlaytestFlag()
     {
         FreeCursorForPlaytest = false;
+
+        // Opt in from the command line, so the shipped game can be driven and
+        // played end to end by a tool rather than only reasoned about.
+        //
+        // A locked cursor takes its look delta from raw mouse input, which
+        // synthetic absolute positioning does not generate - the lock snaps the
+        // pointer back inside the same frame and the net delta is zero, so the
+        // view cannot be turned at all. Releasing the lock makes position
+        // changes readable as deltas again.
+        //
+        // A player never passes this, and nothing in the game sets it.
+        foreach (string arg in System.Environment.GetCommandLineArgs())
+        {
+            if (string.Equals(arg, "-playtestFreeCursor",
+                              System.StringComparison.OrdinalIgnoreCase))
+            {
+                FreeCursorForPlaytest = true;
+            }
+        }
     }
 
     private void LateUpdate()
