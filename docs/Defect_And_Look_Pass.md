@@ -554,6 +554,119 @@ One caveat that no code can remove: in the Unity **Editor**, a lock is only
 honoured while the Game view is the focused pane, and pressing Escape releases
 it unconditionally. Judge the look in the built player, not in the Editor.
 
+## Playing it
+
+Everything above this section was found by reading code and running tests.
+Everything below was found by driving the game with a real mouse and keyboard,
+and the difference in what turned up is the point.
+
+### The look limit was mine
+
+The single most-reported problem, and the cause was the fix I had added for it.
+
+`KeepPointerOffTheEdge` warps the pointer back to the centre when it drifts
+out, and calls `SuppressLookThisFrame` so the warp is not itself read as a huge
+look delta. I had removed its early-out on `Cursor.lockState == Locked`,
+reasoning from an Input System issue that the lock can be reported as held
+while delta has already died at the window edge.
+
+Driving it showed the opposite. The cursor reports dead centre after every
+single move, so the lock genuinely holds - and with the guard removed, any
+movement large enough to leave the middle of the window was warped AND
+suppressed. Small nudges worked; big sweeps were eaten. "It turns a little and
+then stops" was the fallback discarding the input it existed to protect.
+
+The guard is back, with the measurement written beside it. Verified by playing:
+full, unbounded rotation in both directions.
+
+Worth recording for anyone testing this: a locked cursor takes its delta from
+raw mouse input, which SetCursorPos does not generate, so synthetic absolute
+positioning cannot drive the look at all - the lock snaps the pointer back
+inside the same frame and the net delta is exactly zero.
+`PlayerCameraRig.FreeCursorForPlaytest` exists solely so a tool can drive the
+camera; it defaults to false and nothing in the game sets it.
+
+### The Warden killed the player fifteen seconds into a new game
+
+Pressing New Game and standing still was fatal. MuseumNight spawns the player
+at (0,0) and the Warden patrolled a rectangle enclosing that spawn, 8.5 m away
+with a 14 m view cone - so it saw the player at t=0, reached them in about two
+seconds, and four captures at 25 damage killed them while the controls card was
+still on screen.
+
+Then it got worse. A capture sent the Warden to `Search`, whose destination is
+the player's last known position - so it walked on top of the player and parked
+there, re-capturing the moment its blindness lapsed. Death respawned the player
+at the scene start, where it was still standing. Measured: twenty-one captures,
+dead, respawned, dead again, with no way out for any player.
+
+Four changes, and the last is the one that matters:
+
+- The patrol moved to the north of the hall - not over the spawn, and (after a
+  first attempt put it exactly there) not over the single ramp the objective
+  sends the player down either.
+- Twelve seconds of grace at scene start. The teaching scene cannot teach a
+  corpse.
+- A capture returns the Warden to its ROUND rather than searching, with three
+  seconds of genuine blindness, so there is a real chance to run. A night guard
+  who catches someone escorts them out and resumes the round.
+- A Warden capture can never reduce health below a fifth. Structural rather
+  than a tuning number, because tuning kept failing: they patrol the rooms the
+  player must cross, they re-acquire on sight, and death respawns into the same
+  room, so any damage that can reach zero eventually does. Wardens cost health
+  and real score; hazards and the Collector are what can end a run.
+
+Verified by playing: nine captures, health floored at exactly 20, deaths 0.
+
+### The boss's final phase was a coin flip
+
+Phase 3 opened at 12 health per second with no warning and no grace - about
+eight seconds to read a brand new objective, switch era, hold a key the player
+may never have pressed, aim and land a physics throw, with nowhere to run
+because the erosion is the phase rather than a place. Played straight, it
+killed me before I had finished reading what it wanted.
+
+Now six per second after four seconds of calm, with a message naming the key.
+The Hourglass still stops it completely. A fight instead of a dice roll.
+
+### "Times Detected: 0"
+
+On the victory screen, after being spotted repeatedly. `RegisterDetection` had
+existed since Phase 3 and nothing in the game ever called it - only a debug
+tester did. The counter was always zero, being seen cost no score (T8 asks for
+loss to be real), and the detection sting AudioManager watches that counter for
+never played. Wired to the Alert/Patrol to Chase edge.
+
+### World text filled the screen
+
+Walking up to a tutorial plaque to read it made it unreadable: these are
+world-space quads several metres wide, so from arm's length one word spans the
+viewport and hides the room. They had a far fade and no near one.
+
+Both world-text components now fade inside a near limit. The first version of
+that fix folded the near limit into the same test that refreshes the template,
+which stopped `{energy}` being substituted for anyone standing close - so "is
+the player near enough to care" and "is this too close to read" are separate
+questions now, with a test covering it.
+
+### The wayfinding signs displayed the objective
+
+Three lit signs were added to mark the one route out of MuseumNight, reusing
+`WorldObjectiveText` to billboard them - and every sign then read "Objective:
+Reach the Clock of Creation" in letters wide enough to span the screen, because
+that component does not merely billboard, it rewrites the text. Billboarding
+and authoring content are different jobs; `WorldSignpost` does only the first.
+
+### What playing it confirmed works
+
+Menu and New Game; the HUD; unbounded 360 look; WASD and strafing; the
+objective tracker updating through every step; tutorial plaques; the Warden's
+patrol, detection, chase and capture; the detection meter; Q/R era travel with
+its energy cost and colour grading; the Chrono Orb; the complete three-era gear
+puzzle in FrozenCity - take the gear in the Past, install it in the Present,
+verify it in the Future, collect the Chrono Hourglass; all three Collector
+phases; Ctrl slow-time; and the Victory screen. The game can be finished.
+
 ### A latent obstruction the dressing pass introduced
 
 Adding display cases put one plinth directly in the player's path from the

@@ -171,3 +171,17 @@ plan. Full detail, including the root cause of each defect, in `docs/Defect_And_
 | 10.6 | Boss fight verified winnable with real thrown orbs, not just phase logic | Done |
 | 10.7 | Audio coverage: 13 procedural clips, ambience in all three scenes | Done |
 | 10.8 | Full suite 136/136; release build 57 MB compressed, runs clean | Done |
+
+## Phase 11 - Played end to end with mouse and keyboard
+
+| # | Step | State |
+|---|------|-------|
+| 11.1 | Look limit traced to my own warp-and-suppress fallback; guard restored | Done |
+| 11.2 | Warden no longer kills the player 15 s into a new game (patrol, grace, return-to-patrol, non-lethal floor) | Done |
+| 11.3 | Respawn clears hunters, so a death cannot loop | Done |
+| 11.4 | Collector phase 3 given a grace and a survivable rate | Done |
+| 11.5 | "Times Detected" actually counts; being seen costs score | Done |
+| 11.6 | World text fades at close range instead of filling the screen | Done |
+| 11.7 | MuseumNight signposted; objective made directional | Done |
+| 11.8 | Played: menu, museum, FrozenCity 3-era puzzle, ClockCore boss, Victory | Done |
+| 11.9 | Suite 141/141; build 56 MB compressed, runs clean | Done |
