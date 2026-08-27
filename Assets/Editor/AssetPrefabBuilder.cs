@@ -98,6 +98,11 @@ public static class AssetPrefabBuilder
             shard.transform.localPosition = piece.transform.position;
             shard.transform.localRotation = piece.transform.rotation;
 
+            // Same transform-preservation as the LOD tiers - see the note in
+            // BuildLodPrefab. Without it the shards are centimetre-scale and
+            // rotated onto their side.
+            CopyLocalTransform(piece.transform, shard.transform);
+
             shard.AddComponent<MeshFilter>().sharedMesh = piece.sharedMesh;
             shard.AddComponent<MeshRenderer>().sharedMaterial = material;
 
@@ -120,6 +125,7 @@ public static class AssetPrefabBuilder
         {
             var whole = new GameObject("Whole");
             whole.transform.SetParent(intact.transform, false);
+            CopyLocalTransform(pieces[0].transform, whole.transform);
             whole.AddComponent<MeshFilter>().sharedMesh = pieces[0].sharedMesh;
             whole.AddComponent<MeshRenderer>().sharedMaterial = material;
         }
@@ -184,6 +190,16 @@ public static class AssetPrefabBuilder
             var tier = new GameObject(label + "_LOD" + i);
             tier.transform.SetParent(root.transform, false);
 
+            // Carry the source node's TRANSFORM across, not just its mesh.
+            //
+            // Each FBX node holds rotation (89.98, 0, 0) - Blender Z-up to
+            // Unity Y-up - and scale 100, which the importer's fileScale of
+            // 0.01 cancels back to 1. Creating a bare GameObject and assigning
+            // only sharedMesh threw both away, so every LOD tier and every
+            // Voronoi shard became a ~1 cm object lying on its side. The
+            // models were never wrong; this copy step was missing.
+            CopyLocalTransform(tiers[i].transform, tier.transform);
+
             tier.AddComponent<MeshFilter>().sharedMesh = tiers[i].sharedMesh;
             MeshRenderer renderer = tier.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = material;
@@ -204,5 +220,16 @@ public static class AssetPrefabBuilder
 
         Debug.Log("LOD PREFAB OK: " + label + " tris " +
                   counts[0] + " / " + counts[1] + " / " + counts[2]);
+    }
+
+    /// <summary>
+    /// Copies an imported FBX node's local transform onto the rebuilt object,
+    /// so the importer's axis conversion and unit scaling survive.
+    /// </summary>
+    private static void CopyLocalTransform(Transform source, Transform destination)
+    {
+        destination.localPosition = source.localPosition;
+        destination.localRotation = source.localRotation;
+        destination.localScale = source.localScale;
     }
 }

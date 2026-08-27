@@ -185,6 +185,18 @@ public sealed class PlayerInputReader : MonoBehaviour
         lookInput = context.ReadValue<Vector2>();
     }
 
+    /// <summary>
+    /// Drops this frame's look delta.
+    ///
+    /// Used by PlayerCameraRig when it warps the pointer back to the middle of
+    /// the window: the warp itself can surface as one large synthetic delta,
+    /// and applying it would snap the view.
+    /// </summary>
+    public void SuppressLookThisFrame()
+    {
+        lookInput = Vector2.zero;
+    }
+
     public void OnRun(InputAction.CallbackContext context)
     {
         isRunning = context.ReadValueAsButton();

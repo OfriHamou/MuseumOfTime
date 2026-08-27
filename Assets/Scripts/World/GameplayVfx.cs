@@ -13,6 +13,10 @@ using UnityEngine;
 /// </summary>
 public sealed class GameplayVfx : MonoBehaviour
 {
+    [Tooltip("Authored soft-sprite particle material. Wired by " +
+             "SurfaceAndVfxLookBuilder; a runtime fallback is built if null.")]
+    [SerializeField] private Material particleMaterialAsset;
+
     private ParticleSystem shardBurst;
     private ParticleSystem fractureBurst;
 
@@ -99,25 +103,74 @@ public sealed class GameplayVfx : MonoBehaviour
         lastShardCount = shards;
     }
 
-    private static Material particleMaterial;
+    private static Material runtimeParticleMaterial;
 
     /// <summary>
     /// A ParticleSystemRenderer's default material uses a Built-in-RP shader,
-    /// which URP renders as solid magenta - assign a URP-compatible unlit
-    /// particle shader instead so the burst shows its configured colour.
+    /// which URP renders as solid magenta - so a URP unlit particle shader is
+    /// assigned instead.
+    ///
+    /// A shader alone is not enough, though. URP's unlit particle shader with
+    /// no _BaseMap draws every particle as a fully OPAQUE WHITE QUAD, so the
+    /// bursts rendered as clusters of solid white boxes rather than as sparks.
+    /// The authored material (wired by SurfaceAndVfxLookBuilder) carries a
+    /// soft radial sprite; the fallback below generates an equivalent one at
+    /// runtime so an unwired scene still degrades to a soft dot rather than to
+    /// white boxes.
     /// </summary>
-    private static Material GetParticleMaterial()
+    private Material GetParticleMaterial()
     {
-        if (particleMaterial == null)
+        if (particleMaterialAsset != null)
+        {
+            return particleMaterialAsset;
+        }
+
+        if (runtimeParticleMaterial == null)
         {
             Shader shader = Shader.Find("Universal Render Pipeline/Particles/Unlit")
                              ?? Shader.Find("Universal Render Pipeline/Unlit");
-            particleMaterial = new Material(shader) { name = "VfxParticleUnlit" };
-            particleMaterial.SetFloat("_Surface", 1f);
-            particleMaterial.SetFloat("_Blend", 0f);
+
+            runtimeParticleMaterial = new Material(shader) { name = "VfxParticleUnlit (runtime)" };
+            runtimeParticleMaterial.SetFloat("_Surface", 1f);  // Transparent
+            runtimeParticleMaterial.SetFloat("_Blend", 1f);    // Additive
+            runtimeParticleMaterial.SetFloat("_ZWrite", 0f);
+
+            if (runtimeParticleMaterial.HasProperty("_BaseMap"))
+            {
+                runtimeParticleMaterial.SetTexture("_BaseMap", BuildSoftDotTexture());
+            }
         }
 
-        return particleMaterial;
+        return runtimeParticleMaterial;
+    }
+
+    /// <summary>A 64px radial alpha falloff - the shape a particle needs.</summary>
+    private static Texture2D BuildSoftDotTexture()
+    {
+        const int size = 64;
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, true)
+        {
+            name = "VfxSoftDot",
+            wrapMode = TextureWrapMode.Clamp,
+        };
+
+        float centre = (size - 1) * 0.5f;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float dx = (x - centre) / centre;
+                float dy = (y - centre) / centre;
+                float d = Mathf.Clamp01(Mathf.Sqrt(dx * dx + dy * dy));
+
+                float alpha = Mathf.Pow(1f - d, 2.2f);
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+            }
+        }
+
+        tex.Apply();
+        return tex;
     }
 
     private ParticleSystem CreateBurst(string name, Color color, int count, float size)

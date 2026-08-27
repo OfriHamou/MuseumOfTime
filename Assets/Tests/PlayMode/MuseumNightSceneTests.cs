@@ -195,10 +195,25 @@ public sealed class MuseumNightSceneTests
         Assert.IsTrue(map.enabled, "The Player action map is not enabled.");
 
         InputAction move = map.FindAction("Move");
-        Assert.AreEqual(
-            4,
-            move.controls.Count,
-            "Move should resolve to four keyboard controls (WASD).");
+
+        // Assert on WHICH controls are bound, not how many. The count is not
+        // environment-independent: this fixture adds its own Keyboard, so in
+        // the Editor (where a real keyboard is already present) every binding
+        // resolves once per device and the count doubles. The requirement is
+        // that WASD drives Move - that is what is checked.
+        var boundKeys = new System.Collections.Generic.HashSet<string>();
+        foreach (var control in move.controls)
+        {
+            boundKeys.Add(control.name.ToLowerInvariant());
+        }
+
+        foreach (string key in new[] { "w", "a", "s", "d" })
+        {
+            Assert.IsTrue(
+                boundKeys.Contains(key),
+                "Move should be driven by WASD, but '" + key + "' is not bound. " +
+                "Bound controls: " + string.Join(", ", boundKeys) + ".");
+        }
     }
 
     [Test]

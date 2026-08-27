@@ -42,6 +42,19 @@ public sealed class WardenAI : MonoBehaviour, IFreezable
     [SerializeField] private float chaseSpeed = 4.6f;
     [SerializeField] private float searchSeconds = 4f;
 
+    [Header("Capture")]
+    [Tooltip("How close the Warden must get to catch Noa, in metres.")]
+    [SerializeField] private float captureRadius = 1.6f;
+
+    [Tooltip("Health lost when caught. Reaching zero routes to the anchor.")]
+    [SerializeField] private int captureDamage = 25;
+
+    [Tooltip("Score lost when caught, so being seen has a real cost (T8).")]
+    [SerializeField] private int captureScorePenalty = 25;
+
+    [Tooltip("Grace period after a capture before the Warden can catch again.")]
+    [SerializeField] private float captureCooldown = 3f;
+
     private NavMeshAgent agent;
     private PatrolRoute route;
     private Transform player;
@@ -53,6 +66,10 @@ public sealed class WardenAI : MonoBehaviour, IFreezable
     private float frozenUntil;
     private float detection;
     private Vector3 lastKnownPosition;
+    private float captureAllowedAt;
+
+    /// <summary>How many times this Warden has caught Noa. Read by tests.</summary>
+    public int CaptureCount { get; private set; }
 
     /// <summary>
     /// Anything that can block line of sight. Built in code, not assigned in
@@ -133,7 +150,12 @@ public sealed class WardenAI : MonoBehaviour, IFreezable
             return false;
         }
 
-        Vector3 eye = transform.position + (Vector3.up * eyeHeight);
+        // eyeHeight is measured from the FEET. The transform is lifted by the
+        // agent's baseOffset, so adding eyeHeight to it put the eye a metre
+        // higher than intended - at 3.0 m, hunting for a target at 1.28 m.
+        float feet = transform.position.y - (agent != null ? agent.baseOffset : 0f);
+
+        Vector3 eye = new Vector3(transform.position.x, feet + eyeHeight, transform.position.z);
         Vector3 target = player.position + (Vector3.up * 1.2f);
         Vector3 toPlayer = target - eye;
 
@@ -142,7 +164,21 @@ public sealed class WardenAI : MonoBehaviour, IFreezable
             return false;
         }
 
-        if (Vector3.Angle(transform.forward, toPlayer) > viewAngle * 0.5f)
+        // The cone is judged on the HORIZONTAL bearing only.
+        //
+        // Measuring the full 3D angle meant the sightline tilted further down
+        // the closer the player got, and at point-blank range it fell outside
+        // the cone completely: the Warden went blind exactly when the player
+        // was standing on top of it, then wandered off. A ground patrol that
+        // cannot see what is directly in front of it is not a guard, and it
+        // made the whole stealth layer behave at random.
+        Vector3 flatToPlayer = new Vector3(toPlayer.x, 0f, toPlayer.z);
+        Vector3 flatForward = new Vector3(transform.forward.x, 0f, transform.forward.z);
+
+        // Almost on top of it: bearing is meaningless, and being that close
+        // in the open should always count as being seen.
+        if (flatToPlayer.sqrMagnitude > 0.04f &&
+            Vector3.Angle(flatForward, flatToPlayer) > viewAngle * 0.5f)
         {
             return false;
         }
@@ -273,6 +309,60 @@ public sealed class WardenAI : MonoBehaviour, IFreezable
 
         agent.SetDestination(intercept);
         lastKnownPosition = player.position;
+
+        TryCapture();
+    }
+
+    /// <summary>
+    /// Catching Noa. This was the whole missing half of the Warden: it would
+    /// see her, pursue her and reach her, and then nothing happened - no
+    /// damage, no penalty, no reset. Walking into one was indistinguishable
+    /// from walking into a wall, which made the entire stealth layer read as
+    /// decoration and left a player reasonably asking whether the figures
+    /// following them were enemies at all.
+    ///
+    /// The plan asks for a capture to cost health and score and to route
+    /// through the Time Anchor system (T21), which is what happens here: the
+    /// hit is survivable, so a first mistake teaches rather than ends, and
+    /// GameManager.TakeDamage raises PlayerDied at zero, which RespawnService
+    /// already turns into a return to the last anchor.
+    /// </summary>
+    private void TryCapture()
+    {
+        if (Time.time < captureAllowedAt)
+        {
+            return;
+        }
+
+        // Horizontal only: the Warden's agent sits on a baseOffset, so a
+        // straight distance would never close on a player stood on the floor.
+        Vector3 gap = player.position - transform.position;
+        gap.y = 0f;
+
+        if (gap.sqrMagnitude > captureRadius * captureRadius)
+        {
+            return;
+        }
+
+        captureAllowedAt = Time.time + captureCooldown;
+        CaptureCount++;
+
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.TakeDamage(captureDamage);
+            GameManager.Instance.RemoveScore(captureScorePenalty);
+        }
+
+        HudMessageFeed.Post(
+            "Caught by a Time Warden - break line of sight, or freeze it with the Orb",
+            HudMessageFeed.Tone.Bad);
+
+        // It has what it came for; let Noa get away rather than pinning her
+        // in a corner and draining her to death in one contact.
+        state = State.Search;
+        searchUntil = Time.time + searchSeconds;
+        detection = 0f;
+        agent.speed = patrolSpeed;
     }
 
     private void BeginPause()

@@ -127,16 +127,32 @@ public sealed class NoaAnimatorTests
             0.01f,
             "Speed should start at zero.");
 
+        // Sample the PEAK while running, not the value at the end.
+        //
+        // Reading it only after 120 frames quietly assumed the player would
+        // still be in open floor by then, which depends entirely on frame
+        // time: at ~4 m/s, 120 frames covers anywhere from 6 to 12 metres,
+        // and the museum is only about 10 m deep from the spawn point. Once
+        // the scene got heavier (ceiling, display cases, picture lights) the
+        // frames lengthened, the player reliably reached the north wall, and
+        // the test read the Speed of someone standing still against it.
+        //
+        // The peak is the honest measurement of "did movement drive the
+        // Animator", and it still fails outright if the player never moves.
+        float peakSpeed = 0f;
+
         for (int i = 0; i < 120; i++)
         {
             SetPrivate(reader, "moveInput", Vector2.up);
             yield return null;
+
+            peakSpeed = Mathf.Max(peakSpeed, animator.GetFloat("Speed"));
         }
 
         Assert.Greater(
-            animator.GetFloat("Speed"),
+            peakSpeed,
             0.1f,
-            "Speed stayed at zero while the player was moving, so the " +
+            "Speed never rose above zero while the player was moving, so the " +
             "Animator is not being driven by actual movement.");
     }
 

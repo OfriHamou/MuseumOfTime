@@ -24,15 +24,43 @@ public sealed class HUDController : MonoBehaviour
     [SerializeField] private GameObject detectionMeterRoot;
     [SerializeField] private Image detectionFill;
 
+    [Header("Interaction prompt")]
+    [SerializeField] private GameObject interactPromptRoot;
+    [SerializeField] private TMP_Text interactPromptText;
+
+    [Header("Objective")]
+    [SerializeField] private TMP_Text objectiveText;
+    [SerializeField] private TMP_Text objectiveHintText;
+
     private WardenAI[] wardens;
+    private PlayerInteractor interactor;
+    private ObjectiveTracker objectives;
 
     private void Start()
     {
         wardens = FindObjectsByType<WardenAI>(FindObjectsSortMode.None);
+        interactor = GetComponent<PlayerInteractor>();
+
+        objectives = ObjectiveTracker.Instance;
+        if (objectives == null)
+        {
+            objectives = FindAnyObjectByType<ObjectiveTracker>();
+        }
+
+        if (objectives != null)
+        {
+            objectives.Changed += RefreshObjective;
+            RefreshObjective();
+        }
 
         if (detectionMeterRoot != null)
         {
             detectionMeterRoot.SetActive(false);
+        }
+
+        if (interactPromptRoot != null)
+        {
+            interactPromptRoot.SetActive(false);
         }
 
         if (GameManager.Instance != null)
@@ -47,6 +75,33 @@ public sealed class HUDController : MonoBehaviour
         if (GameManager.Instance != null)
         {
             GameManager.Instance.StateChanged -= Refresh;
+        }
+
+        if (objectives != null)
+        {
+            objectives.Changed -= RefreshObjective;
+        }
+    }
+
+    /// <summary>
+    /// Mirrors ObjectiveTracker onto the HUD. Event-driven rather than polled:
+    /// the tracker only raises Changed when the line actually differs.
+    /// </summary>
+    private void RefreshObjective()
+    {
+        if (objectives == null)
+        {
+            return;
+        }
+
+        if (objectiveText != null)
+        {
+            objectiveText.text = objectives.Objective;
+        }
+
+        if (objectiveHintText != null)
+        {
+            objectiveHintText.text = objectives.Hint;
         }
     }
 
@@ -64,6 +119,8 @@ public sealed class HUDController : MonoBehaviour
 
     private void Update()
     {
+        UpdateInteractPrompt();
+
         if (detectionMeterRoot == null || wardens == null || wardens.Length == 0)
         {
             return;
@@ -84,6 +141,32 @@ public sealed class HUDController : MonoBehaviour
         if (detectionFill != null)
         {
             detectionFill.fillAmount = highest;
+        }
+    }
+
+    /// <summary>
+    /// Shows what the thing under the crosshair would do if E were pressed.
+    /// Polled rather than event-driven for the same reason as the detection
+    /// meter: PlayerInteractor raycasts per frame and has no change event.
+    /// </summary>
+    private void UpdateInteractPrompt()
+    {
+        if (interactPromptRoot == null)
+        {
+            return;
+        }
+
+        string prompt = interactor != null ? interactor.CurrentPrompt : null;
+        bool show = !string.IsNullOrEmpty(prompt);
+
+        if (interactPromptRoot.activeSelf != show)
+        {
+            interactPromptRoot.SetActive(show);
+        }
+
+        if (show && interactPromptText != null && interactPromptText.text != prompt)
+        {
+            interactPromptText.text = prompt;
         }
     }
 }

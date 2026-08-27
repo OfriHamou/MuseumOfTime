@@ -367,7 +367,13 @@ public static class FrozenCityContentBuilder
         Ensure<GearPickup>(gear);
 
         GameObject socket = FindOrCreate("GearSocket", puzzleRoot);
-        Vector3 socketPos = towerBase + new Vector3(0f, 0f, -2.5f);
+
+        // -3.6, not -2.5. The tower Shaft is a 6 m cube centred on the tower,
+        // so its front face is 3 m out; at -2.5 the socket sat half a metre
+        // INSIDE the wall. The look-cast hit the tower first and the socket
+        // could never be interacted with, which stopped the gear puzzle - and
+        // therefore the whole FrozenCity chain - dead.
+        Vector3 socketPos = towerBase + new Vector3(0f, 0f, -3.6f);
         socketPos.y = SampleHeight(terrain, socketPos) + 0.5f;
         SetupGearVisual(socket, socketPos, new Vector3(0.6f, 1f, 0.3f));
         Ensure<GearSocket>(socket);

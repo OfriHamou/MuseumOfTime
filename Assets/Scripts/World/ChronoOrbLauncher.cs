@@ -57,6 +57,12 @@ public sealed class ChronoOrbLauncher : MonoBehaviour
         if (GameManager.Instance != null &&
             !GameManager.Instance.SpendEnergy(energyCost))
         {
+            // Silence here reads as a broken mouse button. Say why - the bar
+            // refills on its own, so this is a wait, not a dead end.
+            HudMessageFeed.Post(
+                "Not enough Chrono Energy to throw an orb",
+                HudMessageFeed.Tone.Bad);
+
             return false;
         }
 

@@ -417,7 +417,16 @@ public static class NavigationBuilder
         shadowAgent.height = 1.2f;
         shadowAgent.speed = 3.2f;
 
-        shadow.AddComponent<ShadowAI>();
+        ShadowAI shadowAi = shadow.AddComponent<ShadowAI>();
+
+        // MuseumNight is the teaching scene. The Shadow is here to be seen and
+        // understood, not to cost the player anything: Part 3 places its threat
+        // in FrozenCity onward, and with stealing enabled it emptied this
+        // scene's only two Time Shards before the player reached either.
+        var shadowSo = new SerializedObject(shadowAi);
+        SerializedProperty canSteal = shadowSo.FindProperty("canStealShards");
+        if (canSteal != null) { canSteal.boolValue = false; }
+        shadowSo.ApplyModifiedPropertiesWithoutUndo();
     }
 
     private static GameObject FindOrCreate(string name, GameObject parent)
