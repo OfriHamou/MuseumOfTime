@@ -31,7 +31,7 @@ public static class ScenePolishBuilder
     private const string ColumnPrefab = "Assets/Prefabs/World/StoneColumn.prefab";
 
     // Shared material handles, filled by EnsureMaterials.
-    private static Material marble, plaster, brass, roof, warden, shadowMat, shardGlow, lensGlow, collectorMat, shieldMat;
+    private static Material marble, plaster, brass, roof, warden, shadowMat, shardGlow, lensGlow, collectorMat, shieldMat, facade;
 
     [MenuItem("Museum of Time/Polish Scenes (dressing)")]
     public static void BuildMenu() { Build(); }
@@ -68,6 +68,94 @@ public static class ScenePolishBuilder
         lensGlow = Mat("LensGlow", new Color(1f, 0.78f, 0.35f), new Color(0.95f, 0.6f, 0.2f), 0.3f, 0.6f);
         collectorMat = Mat("Collector", new Color(0.14f, 0.06f, 0.06f), new Color(0.35f, 0.05f, 0.05f), 0.3f, 0.4f);
         shieldMat = Mat("Shield", new Color(0.85f, 0.8f, 0.45f), new Color(0.6f, 0.5f, 0.18f), 0.6f, 0.8f);
+        facade = FacadeMaterial();
+    }
+
+    /// <summary>
+    /// A stone facade with a grid of frosted, lit-from-within windows,
+    /// replacing the flat plaster wall FrozenCity's buildings used to have.
+    /// </summary>
+    private static Material FacadeMaterial()
+    {
+        string path = MatFolder + "/BuildingFacade.mat";
+        Material existing = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (existing != null)
+        {
+            return existing;
+        }
+
+        const int size = 256;
+        var tex = new Texture2D(size, size);
+        var emissionTex = new Texture2D(size, size);
+        Color stone = new Color(0.62f, 0.60f, 0.58f);
+        Color mortar = new Color(0.45f, 0.44f, 0.42f);
+        Color windowLit = new Color(0.95f, 0.75f, 0.35f);
+        Color windowDark = new Color(0.12f, 0.14f, 0.18f);
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float grain = Mathf.PerlinNoise(x * 0.08f, y * 0.08f) * 0.08f;
+                Color c = stone * (0.96f + grain);
+                Color e = Color.black;
+
+                bool mortarLine = (x % 32) < 2 || (y % 20) < 2;
+                if (mortarLine)
+                {
+                    c = mortar;
+                }
+
+                // A window in the centre of every other stone block.
+                int bx = x % 64, by = y % 80;
+                bool inWindow = bx > 16 && bx < 48 && by > 24 && by < 64;
+                if (inWindow)
+                {
+                    bool lit = ((x / 64) + (y / 80)) % 3 != 0;
+                    c = lit ? windowLit : windowDark;
+                    e = lit ? windowLit : Color.black;
+                }
+
+                tex.SetPixel(x, y, c);
+                emissionTex.SetPixel(x, y, e);
+            }
+        }
+
+        tex.Apply();
+        emissionTex.Apply();
+
+        Texture2D imported = SaveTexture(tex, "BuildingFacade");
+        Texture2D importedEmission = SaveTexture(emissionTex, "BuildingFacadeEmission");
+
+        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit")) { name = "BuildingFacade" };
+        mat.SetTexture("_BaseMap", imported);
+        mat.SetTextureScale("_BaseMap", new Vector2(2f, 1.5f));
+        mat.SetFloat("_Smoothness", 0.15f);
+        mat.EnableKeyword("_EMISSION");
+        mat.SetTexture("_EmissionMap", importedEmission);
+        mat.SetTextureScale("_EmissionMap", new Vector2(2f, 1.5f));
+        mat.SetColor("_EmissionColor", Color.white);
+        mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+
+        AssetDatabase.CreateAsset(mat, path);
+        return AssetDatabase.LoadAssetAtPath<Material>(path);
+    }
+
+    private static Texture2D SaveTexture(Texture2D tex, string name)
+    {
+        byte[] png = tex.EncodeToPNG();
+        Object.DestroyImmediate(tex);
+        string texPath = MatFolder + "/" + name + ".png";
+        File.WriteAllBytes(texPath, png);
+        AssetDatabase.ImportAsset(texPath);
+
+        var importer = (TextureImporter)AssetImporter.GetAtPath(texPath);
+        importer.wrapMode = TextureWrapMode.Repeat;
+        importer.filterMode = FilterMode.Bilinear;
+        importer.maxTextureSize = 512;
+        importer.SaveAndReimport();
+
+        return AssetDatabase.LoadAssetAtPath<Texture2D>(texPath);
     }
 
     private static Material Load(string path)
@@ -263,6 +351,13 @@ public static class ScenePolishBuilder
         // A dais under the Collector so the boss reads as the arena's focus.
         Cylinder(root, "CollectorDais", new Vector3(0f, 0.15f, 8f), new Vector3(3.2f, 0.15f, 3.2f), marble);
 
+        // Clockwork: large brass gears mounted on the walls, facing the
+        // arena, so the "final area" reads as the museum's own broken clock
+        // mechanism rather than an empty box.
+        BuildGear(root, new Vector3(-19.4f, 5f, -6f), new Vector3(0f, 90f, 0f), 3f, 12);
+        BuildGear(root, new Vector3(19.4f, 8f, 5f), new Vector3(0f, -90f, 0f), 2.2f, 10);
+        BuildGear(root, new Vector3(0f, 7.6f, -19.4f), Vector3.zero, 2.6f, 10);
+
         // Readability of the gameplay pieces.
         Recolor("Collector", collectorMat);
         RecolorChild("Collector", "Shield", shieldMat);
@@ -282,9 +377,57 @@ public static class ScenePolishBuilder
     {
         float groundY = TerrainHeight(terrain, flat);
         var body = Cube(root, "Building", new Vector3(flat.x, groundY + height / 2f, flat.z),
-                        new Vector3(width, height, depth), Vector3.zero, plaster, false);
+                        new Vector3(width, height, depth), Vector3.zero, facade, false);
         Cube(root, "Roof", body.transform.position + new Vector3(0f, height / 2f + 0.3f, 0f),
              new Vector3(width + 0.4f, 0.6f, depth + 0.4f), Vector3.zero, roof, false);
+    }
+
+    /// <summary>
+    /// A wall-mounted decorative gear: a flat brass disc facing +Z by
+    /// default, ringed with teeth, wrapped in one group so `euler` orients
+    /// the whole assembly to face into the room from whichever wall it sits on.
+    /// </summary>
+    private static void BuildGear(GameObject root, Vector3 pos, Vector3 euler, float radius, int teeth)
+    {
+        var gearRoot = new GameObject("Gear");
+        gearRoot.transform.SetParent(root.transform, false);
+        gearRoot.transform.position = pos;
+        gearRoot.transform.rotation = Quaternion.Euler(euler);
+
+        GameObject disc = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        disc.name = "GearDisc";
+        StripColliders(disc);
+        disc.transform.SetParent(gearRoot.transform, false);
+        disc.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+        disc.transform.localScale = new Vector3(radius, 0.2f, radius);
+        disc.GetComponent<MeshRenderer>().sharedMaterial = brass;
+
+        float toothSize = radius * 0.22f;
+        for (int i = 0; i < teeth; i++)
+        {
+            float angle = i * 360f / teeth;
+            Quaternion rot = Quaternion.Euler(0f, 0f, angle);
+            Vector3 dir = rot * Vector3.up;
+
+            GameObject tooth = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            tooth.name = "GearTooth";
+            StripColliders(tooth);
+            tooth.transform.SetParent(gearRoot.transform, false);
+            tooth.transform.localPosition = dir * (radius + toothSize * 0.4f);
+            tooth.transform.localRotation = rot;
+            tooth.transform.localScale = new Vector3(toothSize, toothSize, 0.3f);
+            tooth.GetComponent<MeshRenderer>().sharedMaterial = brass;
+        }
+
+        // A small emissive hub, echoing the time-energy palette used elsewhere.
+        GameObject hub = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        hub.name = "GearHub";
+        StripColliders(hub);
+        hub.transform.SetParent(gearRoot.transform, false);
+        hub.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+        hub.transform.localPosition = new Vector3(0f, 0f, -0.05f);
+        hub.transform.localScale = new Vector3(radius * 0.22f, 0.25f, radius * 0.22f);
+        hub.GetComponent<MeshRenderer>().sharedMaterial = lensGlow;
     }
 
     private static void BuildLantern(GameObject root, Vector3 pos)
@@ -298,6 +441,13 @@ public static class ScenePolishBuilder
         lamp.transform.position = pos + new Vector3(0f, 2.3f, 0f);
         lamp.transform.localScale = Vector3.one * 0.35f;
         lamp.GetComponent<MeshRenderer>().sharedMaterial = lensGlow;
+
+        Light light = lamp.AddComponent<Light>();
+        light.type = LightType.Point;
+        light.color = new Color(1f, 0.8f, 0.45f);
+        light.intensity = 2.5f;
+        light.range = 6f;
+        light.shadows = LightShadows.None;
     }
 
     // -----------------------------------------------------------------

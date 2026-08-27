@@ -269,8 +269,16 @@ public static class NavigationBuilder
         var root = new GameObject("ShadowShortcut");
         root.transform.position = Vector3.zero;
 
-        Material plaster = AssetDatabase.LoadAssetAtPath<Material>(
-            "Assets/Materials/Museum/MuseumPlaster.mat");
+        const string plasterPath = "Assets/Materials/Museum/MuseumPlaster.mat";
+        Material plaster = AssetDatabase.LoadAssetAtPath<Material>(plasterPath);
+        if (plaster == null)
+        {
+            // A stale AssetDatabase index earlier in the same batch can miss
+            // an asset another builder just created - one retry after a
+            // refresh is enough to pick it up correctly.
+            AssetDatabase.Refresh();
+            plaster = AssetDatabase.LoadAssetAtPath<Material>(plasterPath);
+        }
 
         // A wall across the east side with a 0.8m slot in it. A Warden needs
         // 1.0m of clearance for its diameter; a Shadow needs 0.6m.
@@ -296,10 +304,17 @@ public static class NavigationBuilder
         box.transform.position = position;
         box.transform.localScale = size;
 
-        if (material != null)
+        if (material == null)
         {
-            box.GetComponent<MeshRenderer>().sharedMaterial = material;
+            // A stale AssetDatabase lookup earlier in the batch can return
+            // null here even when the asset exists on disk - never leave the
+            // renderer on Unity's default (URP renders it as solid magenta).
+            Debug.LogWarning("NAV: material missing for '" + name + "' - using a plain fallback.");
+            material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            material.SetColor("_BaseColor", new Color(0.6f, 0.6f, 0.62f));
         }
+
+        box.GetComponent<MeshRenderer>().sharedMaterial = material;
 
         GameObjectUtility.SetStaticEditorFlags(
             box, StaticEditorFlags.NavigationStatic);

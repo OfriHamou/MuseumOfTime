@@ -99,12 +99,34 @@ public sealed class GameplayVfx : MonoBehaviour
         lastShardCount = shards;
     }
 
+    private static Material particleMaterial;
+
+    /// <summary>
+    /// A ParticleSystemRenderer's default material uses a Built-in-RP shader,
+    /// which URP renders as solid magenta - assign a URP-compatible unlit
+    /// particle shader instead so the burst shows its configured colour.
+    /// </summary>
+    private static Material GetParticleMaterial()
+    {
+        if (particleMaterial == null)
+        {
+            Shader shader = Shader.Find("Universal Render Pipeline/Particles/Unlit")
+                             ?? Shader.Find("Universal Render Pipeline/Unlit");
+            particleMaterial = new Material(shader) { name = "VfxParticleUnlit" };
+            particleMaterial.SetFloat("_Surface", 1f);
+            particleMaterial.SetFloat("_Blend", 0f);
+        }
+
+        return particleMaterial;
+    }
+
     private ParticleSystem CreateBurst(string name, Color color, int count, float size)
     {
         var go = new GameObject(name);
         go.transform.SetParent(transform, false);
 
         var ps = go.AddComponent<ParticleSystem>();
+        go.GetComponent<ParticleSystemRenderer>().sharedMaterial = GetParticleMaterial();
         ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
 
         ParticleSystem.MainModule main = ps.main;

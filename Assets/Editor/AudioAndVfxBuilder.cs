@@ -60,9 +60,18 @@ public static class AudioAndVfxBuilder
         BuildGameplayVfx();
         AddShadowDrift();
 
-        if (SceneManager.GetActiveScene().name == "MuseumNight")
+        string sceneName = SceneManager.GetActiveScene().name;
+        if (sceneName == "MuseumNight")
         {
             BuildMuseumLighting();
+        }
+        else if (sceneName == "FrozenCity")
+        {
+            BuildFrozenCityLighting();
+        }
+        else if (sceneName == "ClockCore")
+        {
+            BuildClockCoreLighting();
         }
 
         EditorSceneManager.MarkSceneDirty(scene);
@@ -184,7 +193,7 @@ public static class AudioAndVfxBuilder
             var trail = new GameObject("OrbTrail");
             trail.transform.SetParent(root.transform, false);
 
-            ParticleSystem ps = trail.AddComponent<ParticleSystem>();
+            ParticleSystem ps = EnsureParticles(trail);
             ParticleSystem.MainModule main = ps.main;
             main.loop = true;
             main.playOnAwake = true;
@@ -208,10 +217,40 @@ public static class AudioAndVfxBuilder
         PrefabUtility.UnloadPrefabContents(root);
     }
 
+    private static Material particleMaterial;
+
+    /// <summary>
+    /// A ParticleSystemRenderer's default material uses a Built-in-RP shader,
+    /// which URP renders as a solid magenta/pink error colour - the "broken
+    /// materials" bug every particle effect in the game was silently hitting.
+    /// URP ships a dedicated unlit particle shader for exactly this case.
+    /// </summary>
+    private static Material GetParticleMaterial()
+    {
+        if (particleMaterial == null)
+        {
+            Shader shader = Shader.Find("Universal Render Pipeline/Particles/Unlit")
+                             ?? Shader.Find("Universal Render Pipeline/Unlit");
+            particleMaterial = new Material(shader) { name = "VfxParticleUnlit" };
+            particleMaterial.SetFloat("_Surface", 1f); // Transparent
+            particleMaterial.SetFloat("_Blend", 0f);   // Alpha blend
+            particleMaterial.SetOverrideTag("RenderType", "Transparent");
+            particleMaterial.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+        }
+
+        return particleMaterial;
+    }
+
     private static ParticleSystem EnsureParticles(GameObject go)
     {
         ParticleSystem ps = go.GetComponent<ParticleSystem>();
-        return ps == null ? go.AddComponent<ParticleSystem>() : ps;
+        if (ps == null)
+        {
+            ps = go.AddComponent<ParticleSystem>();
+        }
+
+        go.GetComponent<ParticleSystemRenderer>().sharedMaterial = GetParticleMaterial();
+        return ps;
     }
 
     private static void ConfigureBurst(ParticleSystem ps, int count, float size, Color color, float radius)
@@ -283,6 +322,64 @@ public static class AudioAndVfxBuilder
             spot.spotAngle = 55f;
             spot.shadows = LightShadows.None;
         }
+    }
+
+    /// <summary>
+    /// FrozenCity: a cool, low, dusk-blue key light (the city froze before
+    /// sunset) with a cold ambient floor, so the warm lanterns along the
+    /// central path read as the one point of remaining life/warmth.
+    /// </summary>
+    private static void BuildFrozenCityLighting()
+    {
+        RenderSettings.ambientMode = AmbientMode.Flat;
+        RenderSettings.ambientLight = new Color(0.10f, 0.13f, 0.18f);
+
+        GameObject root = FindOrCreate("FrozenCityLighting", null);
+        ClearChildren(root);
+
+        var sun = new GameObject("DuskLight");
+        sun.transform.SetParent(root.transform, false);
+        sun.transform.rotation = Quaternion.Euler(15f, -40f, 0f);
+        Light dusk = sun.AddComponent<Light>();
+        dusk.type = LightType.Directional;
+        dusk.color = new Color(0.55f, 0.68f, 0.95f);
+        dusk.intensity = 0.6f;
+        dusk.shadows = LightShadows.Soft;
+    }
+
+    /// <summary>
+    /// ClockCore: a moody violet ambient (the arena the museum's own clock
+    /// broke into) with one warm, focused spotlight over the Collector's
+    /// dais, so the boss reads as the room's one deliberate focal point.
+    /// </summary>
+    private static void BuildClockCoreLighting()
+    {
+        RenderSettings.ambientMode = AmbientMode.Flat;
+        RenderSettings.ambientLight = new Color(0.09f, 0.06f, 0.14f);
+
+        GameObject root = FindOrCreate("ClockCoreLighting", null);
+        ClearChildren(root);
+
+        var rim = new GameObject("TimeRimLight");
+        rim.transform.SetParent(root.transform, false);
+        rim.transform.rotation = Quaternion.Euler(35f, 130f, 0f);
+        Light rimLight = rim.AddComponent<Light>();
+        rimLight.type = LightType.Directional;
+        rimLight.color = new Color(0.55f, 0.4f, 0.9f);
+        rimLight.intensity = 0.4f;
+        rimLight.shadows = LightShadows.None;
+
+        var spotGo = new GameObject("CollectorSpotlight");
+        spotGo.transform.SetParent(root.transform, false);
+        spotGo.transform.position = new Vector3(0f, 7.5f, 8f);
+        spotGo.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+        Light spot = spotGo.AddComponent<Light>();
+        spot.type = LightType.Spot;
+        spot.color = new Color(1f, 0.75f, 0.4f);
+        spot.intensity = 6f;
+        spot.range = 14f;
+        spot.spotAngle = 45f;
+        spot.shadows = LightShadows.Soft;
     }
 
     // ---------------- helpers ----------------

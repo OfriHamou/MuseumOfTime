@@ -144,7 +144,12 @@ public static class TutorialTextBuilder
     {
         TextMeshPro tmp = MenuUIBuilder.Ensure<TextMeshPro>(go);
         tmp.text = message;
-        tmp.fontSize = 2.5f;
+        // fontSize=2.5 in a 1.2m-tall box was ~2x the box height per line,
+        // overflowing/clipping badly - auto-size keeps any message length
+        // readable without another magic constant to get wrong.
+        tmp.enableAutoSizing = true;
+        tmp.fontSizeMin = 0.3f;
+        tmp.fontSizeMax = 0.9f;
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.color = Color.white;
         tmp.enableWordWrapping = true;
