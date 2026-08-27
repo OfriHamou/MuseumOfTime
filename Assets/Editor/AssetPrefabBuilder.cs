@@ -44,8 +44,7 @@ public static class AssetPrefabBuilder
         Directory.CreateDirectory(PrefabFolder);
         AssetDatabase.Refresh();
 
-        Material marble = AssetDatabase.LoadAssetAtPath<Material>(
-            "Assets/Materials/Museum/MuseumMarble.mat");
+        Material marble = ResolveMarble();
 
         BuildFracturePrefab("ClockOfCreation", marble);
         BuildFracturePrefab("FrozenStatue", marble);
@@ -55,6 +54,55 @@ public static class AssetPrefabBuilder
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
+    }
+
+    /// <summary>
+    /// The stone material for the fracture and LOD props, guaranteed non-null.
+    ///
+    /// This used to be a bare LoadAssetAtPath on MuseumMarble.mat, which reads
+    /// as safe and was not: MuseumBuilder is what CREATES that material, and it
+    /// runs four steps later in FullSceneRebuild. On a clean rebuild the load
+    /// returned null, every LOD tier and every fracture shard was written with
+    /// an empty material slot, and Unity drew all of them in the magenta error
+    /// shader - two of the graded requirement props (T10, T11) shipped bright
+    /// pink at the foot of the clock tower.
+    ///
+    /// Nothing warned, because a null material is not an error to Unity. So
+    /// rather than depend on builder order, make one if it is missing and say
+    /// so.
+    /// </summary>
+    private static Material ResolveMarble()
+    {
+        const string path = "Assets/Materials/Museum/MuseumMarble.mat";
+
+        var marble = AssetDatabase.LoadAssetAtPath<Material>(path);
+
+        if (marble != null)
+        {
+            return marble;
+        }
+
+        Debug.LogWarning(
+            "MuseumMarble.mat did not exist yet, so the LOD and fracture props " +
+            "would have been built with null materials and rendered magenta. " +
+            "Creating a stand-in; MuseumBuilder will overwrite it in place.");
+
+        Directory.CreateDirectory("Assets/Materials/Museum");
+        AssetDatabase.Refresh();
+
+        marble = new Material(Shader.Find("Universal Render Pipeline/Lit"))
+        {
+            name = "MuseumMarble",
+        };
+
+        marble.SetColor("_BaseColor", new Color(0.90f, 0.89f, 0.86f));
+        marble.SetFloat("_Smoothness", 0.65f);
+        marble.SetFloat("_Metallic", 0f);
+
+        AssetDatabase.CreateAsset(marble, path);
+        AssetDatabase.SaveAssets();
+
+        return marble;
     }
 
     // -----------------------------------------------------------------

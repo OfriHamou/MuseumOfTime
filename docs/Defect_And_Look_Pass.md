@@ -477,6 +477,47 @@ a wall.
 real camera forward, under real gravity, and requires the shield to break from
 the hits landing. It does.
 
+### Two graded props shipped bright magenta
+
+`AssetPrefabBuilder` loaded `MuseumMarble.mat` by path to skin the LOD tiers
+(T11) and the fracture shards (T10). But `MuseumBuilder` is what *creates* that
+material, and it runs four steps later in `FullSceneRebuild`. On a clean
+rebuild the load returned null, every tier was written with an empty material
+slot, and Unity drew all of them in the error shader - twenty-one renderers of
+bright pink stone at the foot of the clock tower.
+
+A null material is not an error to Unity. Nothing logged, nothing threw, and
+every other test passed; the only symptom was visual. `MaterialIntegrityTests`
+now walks all five scenes and fails on any renderer with a missing material or
+the error shader, and the builder creates a stand-in rather than depending on
+builder order.
+
+### The terrain was flat, but only on the second rebuild
+
+T6 asks for a sculpted terrain. `SculptHeights` produced a proper relief of
+0.85 and `SetHeights` wrote it correctly - and then `PaintLayers` threw it
+away.
+
+`CreateTerrainData` deletes and recreates the `.asset`, so the object it
+returns is a fresh, *flat* TerrainData and the sculpt exists only in memory.
+`PaintLayers` then writes three PNGs and calls
+`TextureImporter.SaveAndReimport`, and that import reloads the terrain asset
+from its still-flat on-disk state.
+
+It survived the first rebuild because the previous run's asset was still
+there, which is why this only appeared on the second rebuild in a row - and a
+flat terrain is indistinguishable from a plane in a screenshot. The sculpt is
+now committed to disk before anything can reimport it, and the builder logs an
+error if the finished heightmap has no relief.
+
+### Pickup labels were squashed
+
+`PickupBeacon` set the label's `localScale` for constant apparent size, which
+is not enough on its own: the label hangs off the pickup, and the pickups carry
+their own non-uniform scale. The Chrono Hourglass is `(0.3, 0.5, 0.3)`, so its
+prompt rendered at a third of its width. The parent's contribution is divided
+back out now.
+
 ### A latent obstruction the dressing pass introduced
 
 Adding display cases put one plinth directly in the player's path from the

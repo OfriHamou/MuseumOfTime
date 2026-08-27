@@ -100,7 +100,22 @@ public sealed class PickupBeacon : MonoBehaviour
 
         // Constant apparent size, the same trick the enemy nameplates use.
         float toCamera = Vector3.Distance(cam.transform.position, label.transform.position);
-        label.transform.localScale = Vector3.one * (Mathf.Max(1.5f, toCamera) * labelScreenScale);
+        float size = Mathf.Max(1.5f, toCamera) * labelScreenScale;
+
+        // localScale is not enough on its own. The label hangs off the pickup,
+        // and the pickups carry their own non-uniform scale - the Chrono
+        // Hourglass is (0.3, 0.5, 0.3) - which multiplies straight through and
+        // rendered every prompt squashed to a third of its width. Divide the
+        // parent's contribution back out so the text is the shape it was set
+        // in, whatever it happens to be hanging from.
+        Vector3 parentScale = label.transform.parent != null
+            ? label.transform.parent.lossyScale
+            : Vector3.one;
+
+        label.transform.localScale = new Vector3(
+            size / Mathf.Max(0.0001f, Mathf.Abs(parentScale.x)),
+            size / Mathf.Max(0.0001f, Mathf.Abs(parentScale.y)),
+            size / Mathf.Max(0.0001f, Mathf.Abs(parentScale.z)));
 
         label.transform.rotation = Quaternion.LookRotation(
             label.transform.position - cam.transform.position);
