@@ -43,8 +43,30 @@ public static class TerrainBuilder
         Directory.CreateDirectory(AssetFolder);
 
         TerrainData data = CreateTerrainData();
+
         SculptHeights(data);
+
+        // Commit the sculpt to disk BEFORE painting, and this ordering is
+        // load-bearing rather than tidiness.
+        //
+        // CreateTerrainData deletes and recreates the .asset, so what comes
+        // back is a fresh, FLAT TerrainData and SetHeights only changes it in
+        // memory. PaintLayers then writes three PNGs and calls
+        // TextureImporter.SaveAndReimport, which runs an AssetDatabase import
+        // - and that reloads the terrain asset from its still-flat on-disk
+        // state, throwing the sculpt away.
+        //
+        // The result was a terrain with no relief at all (T6 asks for a
+        // sculpted one), and only on the SECOND rebuild in a row: the first
+        // survived because the previous run's asset was still on disk. It
+        // looks identical to a plane in every screenshot and nothing warned.
+        EditorUtility.SetDirty(data);
+        AssetDatabase.SaveAssets();
+
         PaintLayers(data);
+
+        EditorUtility.SetDirty(data);
+        AssetDatabase.SaveAssets();
 
         GameObject existing = GameObject.Find("FrozenCityTerrain");
         if (existing != null)
@@ -70,10 +92,45 @@ public static class TerrainBuilder
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
 
+        float relief = MeasureRelief(data);
+
+        if (relief < 0.01f)
+        {
+            Debug.LogError(
+                "TERRAIN FLAT: the heightmap has no relief (" + relief.ToString("F4") +
+                "). T6 requires a sculpted terrain, and a flat one looks " +
+                "identical to a plane in every screenshot.");
+        }
+
         Debug.Log(
             "TERRAIN OK: " + TerrainSize + "x" + TerrainSize + "m, " +
             HeightmapResolution + " heightmap, max height " + TerrainHeight +
-            "m, " + data.terrainLayers.Length + " paint layers.");
+            "m, " + data.terrainLayers.Length + " paint layers, relief " +
+            relief.ToString("F3") + ".");
+    }
+
+    /// <summary>
+    /// Peak-to-trough spread of the heightmap, 0 to 1. Zero means a plane.
+    /// </summary>
+    private static float MeasureRelief(TerrainData data)
+    {
+        int res = data.heightmapResolution;
+        float[,] heights = data.GetHeights(0, 0, res, res);
+
+        float low = 1f;
+        float high = 0f;
+
+        for (int y = 0; y < res; y += 4)
+        {
+            for (int x = 0; x < res; x += 4)
+            {
+                float h = heights[y, x];
+                if (h < low) { low = h; }
+                if (h > high) { high = h; }
+            }
+        }
+
+        return high - low;
     }
 
     private static TerrainData CreateTerrainData()
