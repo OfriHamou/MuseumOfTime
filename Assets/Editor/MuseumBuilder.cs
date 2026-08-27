@@ -147,14 +147,48 @@ public static class MuseumBuilder
         Texture2D imported = AssetDatabase.LoadAssetAtPath<Texture2D>(texPath);
 
         string matPath = MaterialFolder + "/" + name + ".mat";
-        var material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+
+        // Update the existing asset IN PLACE. Never delete and recreate it.
+        //
+        // This used to be DeleteAsset followed by CreateAsset, which is the
+        // same thing as far as the file on disk goes and completely different
+        // as far as every reference to it goes: the new asset gets a new GUID,
+        // so every prefab and every scene object still pointing at the old one
+        // silently becomes a null material and renders in the magenta error
+        // shader. The LOD props (T11) and fracture shards (T10) are built by
+        // AssetPrefabBuilder, which runs BEFORE this, so a full rebuild broke
+        // them every single time - twenty-seven renderers in MuseumNight
+        // alone, and they came back on the very next rebuild after being
+        // "fixed".
+        //
+        // Mutating the existing material keeps its GUID, so references hold.
+        var material = AssetDatabase.LoadAssetAtPath<Material>(matPath);
+        bool isNew = material == null;
+
+        if (isNew)
+        {
+            material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+        }
+        else
+        {
+            material.shader = Shader.Find("Universal Render Pipeline/Lit");
+        }
+
         material.SetTexture("_BaseMap", imported);
         material.SetTextureScale("_BaseMap", tiling);
         material.SetFloat("_Smoothness", smoothness);
         material.SetFloat("_Metallic", metallic);
 
-        AssetDatabase.DeleteAsset(matPath);
-        AssetDatabase.CreateAsset(material, matPath);
+        if (isNew)
+        {
+            AssetDatabase.CreateAsset(material, matPath);
+        }
+        else
+        {
+            EditorUtility.SetDirty(material);
+        }
+
+        AssetDatabase.SaveAssets();
 
         return AssetDatabase.LoadAssetAtPath<Material>(matPath);
     }

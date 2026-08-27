@@ -101,13 +101,19 @@ public sealed class ObjectiveTracker : MonoBehaviour
     {
         if (!state.hasTimeLens)
         {
+            // Say WHICH WAY. "Up the stairs" is not a direction in a dark
+            // thirty-metre hall with one unlit ramp in a far corner - the
+            // ramp is at the west end, and a player told only that stairs
+            // exist will wander the room looking for them.
             Set("Find the Time Lens",
-                "It is in the curator's office, up the stairs on the mezzanine.");
+                "Take the ramp at the WEST end of the hall, then follow the " +
+                "mezzanine east to the curator's office.");
             return;
         }
 
         Set("Leave the museum",
-            "The Time Lens is yours. Head for the exit on the upper floor.");
+            "The Time Lens is yours. Q and R now travel between eras. " +
+            "Head for the exit on the upper floor.");
     }
 
     private void EvaluateFrozenCity(GameState state)

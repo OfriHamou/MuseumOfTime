@@ -171,7 +171,20 @@ public sealed class ClockCoreSceneTests
         GameManager.Instance.RestoreFullHealth();
         int before = GameManager.Instance.State.currentHealth;
 
-        for (int i = 0; i < 30; i++)
+        // Phase 3 opens with a few seconds of calm before the erosion starts.
+        //
+        // That grace is deliberate. Without it the phase began at 12 health a
+        // second with no warning, which gives a player about eight seconds to
+        // read a brand new objective, switch era, hold a key they may never
+        // have pressed, and land a physics throw - and there is nowhere to run
+        // to, because the erosion is the phase rather than a place. Played
+        // straight it simply killed me before I had finished reading it.
+        //
+        // So wait past the grace, then assert the erosion really does bite.
+        float deadline = Time.time + 12f;
+
+        while (GameManager.Instance.State.currentHealth >= before &&
+               Time.time < deadline)
         {
             yield return null;
         }
@@ -179,7 +192,8 @@ public sealed class ClockCoreSceneTests
         Assert.Less(
             GameManager.Instance.State.currentHealth,
             before,
-            "Time should be eroding Noa's health in the Future phase while the Hourglass is inactive.");
+            "Time should be eroding Noa's health in the Future phase while " +
+            "the Hourglass is inactive, once the opening grace has passed.");
     }
 
     private static void RegisterOrbHit(Collector target)
@@ -204,5 +218,37 @@ public sealed class ClockCoreSceneTests
     {
         FieldInfo info = target.GetType().GetField(field, BindingFlags.Instance | BindingFlags.NonPublic);
         info.SetValue(target, value);
+    }
+
+    /// <summary>
+    /// The grace at the start of phase 3 - the difference between a climax
+    /// and a coin flip.
+    /// </summary>
+    [UnityTest]
+    public IEnumerator Phase3_GivesAMomentBeforeTheErosionStarts()
+    {
+        var era = Object.FindFirstObjectByType<EraManager>();
+        era.SetEra(TimeEra.Past);
+        RegisterOrbHit(collector);
+        RegisterOrbHit(collector);
+        era.SetEra(TimeEra.Present);
+        RegisterOrbHit(collector);
+        era.SetEra(TimeEra.Future);
+
+        GameManager.Instance.RestoreFullHealth();
+        int before = GameManager.Instance.State.currentHealth;
+
+        // Well inside the grace window.
+        float until = Time.time + 1.5f;
+
+        while (Time.time < until)
+        {
+            yield return null;
+        }
+
+        Assert.AreEqual(
+            before, GameManager.Instance.State.currentHealth,
+            "The erosion started immediately. The player needs a moment to " +
+            "read what the phase is asking before it starts killing them.");
     }
 }

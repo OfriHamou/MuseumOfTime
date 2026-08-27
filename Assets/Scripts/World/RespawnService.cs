@@ -94,7 +94,35 @@ public sealed class RespawnService : MonoBehaviour
             GameManager.Instance.RemoveScore(scorePenalty);
         }
 
+        ClearTheAreaOfHunters();
+
         RespawnCount++;
+    }
+
+    /// <summary>
+    /// Sends every hunter back to its round before the player is put back on
+    /// their feet.
+    ///
+    /// A respawn is supposed to be a second chance. Without this it is not
+    /// one: the Warden that just killed the player is still standing on the
+    /// respawn point with a full detection meter, so it catches them again
+    /// immediately and the run is over regardless of what the player does.
+    /// This was measured in a real play session - twenty-one captures in a
+    /// row and no way out of it.
+    /// </summary>
+    private static void ClearTheAreaOfHunters()
+    {
+        foreach (WardenAI warden in Object.FindObjectsByType<WardenAI>(
+                     FindObjectsSortMode.None))
+        {
+            warden.ReturnToPatrol();
+        }
+
+        foreach (ShadowAI shadow in Object.FindObjectsByType<ShadowAI>(
+                     FindObjectsSortMode.None))
+        {
+            shadow.Freeze(2f);
+        }
     }
 
     /// <summary>
