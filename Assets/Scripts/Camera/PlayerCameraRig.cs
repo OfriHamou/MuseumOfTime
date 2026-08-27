@@ -23,7 +23,17 @@ public sealed class PlayerCameraRig : MonoBehaviour
 
     [Header("Look")]
     [SerializeField] private Transform cameraPivot;
-    [SerializeField] private float mouseSensitivity = 0.12f;
+    /// <summary>
+    /// Degrees of rotation per unit of mouse delta.
+    ///
+    /// This was 0.12, which is slow enough that turning round meant dragging
+    /// the mouse across the mat several times - and on a desk that runs out of
+    /// room, which reads as the view refusing to turn any further even though
+    /// nothing in the code limits it. Making a small movement cover a large
+    /// angle is what makes looking around feel like looking around.
+    /// </summary>
+    [Range(0.05f, 1f)]
+    [SerializeField] private float mouseSensitivity = 0.35f;
 
     [Tooltip("How far Noa can look up and down, in degrees.")]
     [SerializeField] private float minPitch = -70f;
@@ -111,6 +121,25 @@ public sealed class PlayerCameraRig : MonoBehaviour
     /// through end to end rather than only asserted about.
     /// </summary>
     public static bool FreeCursorForPlaytest;
+
+    /// <summary>
+    /// Clears the playtest flag at the start of every run.
+    ///
+    /// It is a static, so without this it survives for the lifetime of the
+    /// Editor's script domain - set it once to steer the camera by hand and it
+    /// stays set through every later play session and every test run in that
+    /// domain. It did exactly that: four CursorLockTests failed because the rig
+    /// had been told not to capture the cursor half an hour earlier.
+    ///
+    /// SubsystemRegistration runs before the first scene loads on every entry
+    /// to play mode, which is the right place to reset statics that must not
+    /// carry over.
+    /// </summary>
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetPlaytestFlag()
+    {
+        FreeCursorForPlaytest = false;
+    }
 
     private void LateUpdate()
     {
