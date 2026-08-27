@@ -121,4 +121,52 @@ public sealed class CursorLockTests
             rig.CursorCaptureWanted,
             "Resuming should hand the cursor back to gameplay.");
     }
+
+    /// <summary>
+    /// The edge-recentring fallback must stay inert while the pointer is
+    /// still, and this is the guard on a genuinely dangerous change.
+    ///
+    /// The fallback exists because a pointer that reaches the window edge
+    /// stops producing movement - Mouse/delta goes to zero and the view stops
+    /// turning part-way round, which is the reported symptom. It originally
+    /// refused to run whenever lockState said Locked, which skipped the very
+    /// case it was written for, since lockState is a request rather than a
+    /// reading of what the OS is doing.
+    ///
+    /// Letting it run regardless introduces the opposite risk: what Unity
+    /// reports for the pointer position while locked is not guaranteed to be
+    /// the window centre, and a stale off-centre value would make it warp and
+    /// suppress look on EVERY frame - which would not limit looking, it would
+    /// disable it. Requiring the pointer to have actually moved is what makes
+    /// that impossible, so it is worth a test rather than a comment.
+    /// </summary>
+    [UnityTest]
+    public IEnumerator AStillPointerIsNeverWarpedSoLookIsNeverSuppressed()
+    {
+        var reader = Object.FindFirstObjectByType<PlayerInputReader>();
+        Assert.IsNotNull(reader, "No PlayerInputReader in MuseumNight.");
+
+        // Nothing is moving the mouse during a test run, so this is exactly
+        // the "pointer held still" case.
+        for (int i = 0; i < 30; i++)
+        {
+            yield return null;
+
+            Assert.IsTrue(
+                rig.CursorCaptureWanted,
+                "Gameplay stopped wanting the cursor for no reason.");
+        }
+
+        // Feed a look value and confirm it survives a frame - if the fallback
+        // were warping every frame it would be suppressed away to zero.
+        reader.SetLookForTesting(new Vector2(3f, 0f));
+
+        Assert.AreNotEqual(
+            Vector2.zero, reader.LookInput,
+            "Look input was suppressed while the pointer was completely " +
+            "still, so the recentring fallback is firing when it should be " +
+            "inert - the player would be unable to look at all.");
+
+        yield return null;
+    }
 }

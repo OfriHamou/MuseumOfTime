@@ -518,6 +518,42 @@ their own non-uniform scale. The Chrono Hourglass is `(0.3, 0.5, 0.3)`, so its
 prompt rendered at a third of its width. The parent's contribution is divided
 back out now.
 
+### The look limit, researched rather than reasoned about
+
+Reported three times, so worth recording what the answer turned out to be
+rather than only what changed.
+
+The bindings were checked first and were correct: the Look action reads
+`<Mouse>/delta`, not `<Mouse>/position`, so it was not the classic
+position-clamps-at-the-screen-edge mistake. Yaw is
+`transform.Rotate(Vector3.up, ...)` and is genuinely unbounded; only pitch is
+clamped, at -70/+80, which is standard. The cursor handling already followed
+the canonical pattern - re-assert `CursorLockMode.Locked` every frame,
+re-assert on `OnApplicationFocus`, and release only for the pause menu.
+
+The Unity Input System issue tracker names the actual failure: at the window
+edge the OS stops producing movement, **delta goes to zero on that axis, and
+the lock is reported as no longer held**. Which means `lockState` is a request,
+not a reading of what the OS is doing.
+
+That matters because the recentring fallback bailed out early whenever
+`lockState == Locked` - on the reasoning that a held lock already pins the
+pointer, so a warp would be redundant. That reasoning skipped precisely the
+case the fallback was written for. It never ran when it was needed.
+
+It now runs regardless of the reported lock state. The dangerous half of that
+change is guarded: what Unity reports for the pointer position while locked is
+not guaranteed to be the window centre, and a stale off-centre value would make
+it warp and suppress look on every frame, disabling looking entirely rather
+than merely limiting it. So a warp additionally requires the pointer to have
+actually *moved* since the previous frame - a still pointer needs no rescue.
+`CursorLockTests.AStillPointerIsNeverWarpedSoLookIsNeverSuppressed` pins that
+down.
+
+One caveat that no code can remove: in the Unity **Editor**, a lock is only
+honoured while the Game view is the focused pane, and pressing Escape releases
+it unconditionally. Judge the look in the built player, not in the Editor.
+
 ### A latent obstruction the dressing pass introduced
 
 Adding display cases put one plinth directly in the player's path from the

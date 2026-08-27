@@ -38,6 +38,10 @@ public sealed class PlayerCameraRig : MonoBehaviour
     private PlayerInputReader inputReader;
     private PauseMenuController pauseMenu;
     private float pitch;
+
+    /// <summary>Last reported pointer position, used to tell a loose pointer
+    /// from one the OS is holding still.</summary>
+    private Vector2 lastPointerPosition;
     private bool isFirstPerson;
 
     /// <summary>True while the first-person camera is the live one.</summary>
@@ -168,10 +172,26 @@ public sealed class PlayerCameraRig : MonoBehaviour
     /// </summary>
     private void KeepPointerOffTheEdge()
     {
-        if (!CursorCaptureWanted || Cursor.lockState == CursorLockMode.Locked)
+        if (!CursorCaptureWanted)
         {
             return;
         }
+
+        // Note what is NOT checked here: whether the lock is currently held.
+        //
+        // An earlier version returned early when lockState was Locked, on the
+        // reasoning that a held lock already pins the pointer and warping it
+        // would be redundant. That reasoning skipped the exact case this
+        // method exists for. The documented failure is that the pointer
+        // reaches the window edge, the OS stops producing movement, and the
+        // lock is dropped - and lockState is a request, not a reading of what
+        // the OS is actually doing, so it can still say Locked while delta has
+        // already gone to zero on that axis. Bailing out on it meant the
+        // fallback never ran in the one situation it was written for.
+        //
+        // Warping when the lock genuinely holds costs nothing: a held lock
+        // keeps the reported position at the centre, so the margin test below
+        // never trips and no warp is issued.
 
         Mouse mouse = Mouse.current;
 
@@ -183,12 +203,33 @@ public sealed class PlayerCameraRig : MonoBehaviour
         var centre = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
         Vector2 position = mouse.position.ReadValue();
 
-        // Only warp once the pointer is actually drifting outward, so the
-        // per-frame warp cannot fight a still mouse or add jitter.
+        Vector2 travelled = position - lastPointerPosition;
+        lastPointerPosition = position;
+
+        // Two conditions, and the second one matters as much as the first.
+        //
+        //   1. The pointer is drifting out towards an edge.
+        //   2. It is genuinely moving.
+        //
+        // Without (2) this is dangerous rather than merely redundant. A held
+        // lock pins the OS pointer, but what Unity REPORTS for its position
+        // while locked is not guaranteed to be the window centre - some
+        // platforms keep returning the last free position instead. If that
+        // stale value happens to sit outside the margin, a position-only test
+        // would warp and suppress look on every single frame, which would not
+        // limit the view, it would disable it completely.
+        //
+        // A pointer that is not moving needs no rescue, so requiring real
+        // travel makes this inert whenever the lock is doing its job and
+        // active only when the pointer is actually running loose.
         float margin = Mathf.Min(Screen.width, Screen.height) * 0.25f;
 
-        if (Mathf.Abs(position.x - centre.x) < margin &&
-            Mathf.Abs(position.y - centre.y) < margin)
+        bool driftingOut = Mathf.Abs(position.x - centre.x) >= margin ||
+                           Mathf.Abs(position.y - centre.y) >= margin;
+
+        bool actuallyMoving = travelled.sqrMagnitude > 0.01f;
+
+        if (!driftingOut || !actuallyMoving)
         {
             return;
         }
