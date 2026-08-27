@@ -129,6 +129,14 @@ public static class CameraRigParityBuilder
         follow.VerticalArmLength = 0.15f;
         follow.CameraDistance = 2.6f;
 
+        // ---- Falling out of the world ---------------------------------------
+        //
+        // There was no kill plane anywhere in the project, so a player who
+        // jumped off the mezzanine and over the wall fell forever with no
+        // death and no respawn - a permanent softlock reachable by taking
+        // "leave the museum" literally.
+        Ensure<FallGuard>(player);
+
         // ---- The switcher --------------------------------------------------
         PlayerCameraRig rig = Ensure<PlayerCameraRig>(player);
 

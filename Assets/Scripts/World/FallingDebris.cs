@@ -130,6 +130,7 @@ public sealed class FallingDebris : MonoBehaviour
 
         if (GameManager.Instance != null)
         {
+            RespawnService.LastCauseOfDeath = "Falling debris crushed you.";
             GameManager.Instance.TakeDamage(damage);
         }
 

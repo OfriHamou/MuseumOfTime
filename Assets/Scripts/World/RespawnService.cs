@@ -31,7 +31,7 @@ public sealed class RespawnService : MonoBehaviour
     {
         if (GameManager.Instance != null)
         {
-            GameManager.Instance.PlayerDied += Respawn;
+            GameManager.Instance.PlayerDied += OnPlayerDied;
         }
     }
 
@@ -39,9 +39,45 @@ public sealed class RespawnService : MonoBehaviour
     {
         if (GameManager.Instance != null)
         {
-            GameManager.Instance.PlayerDied -= Respawn;
+            GameManager.Instance.PlayerDied -= OnPlayerDied;
         }
     }
+
+    /// <summary>
+    /// Shows the death screen, THEN respawns.
+    ///
+    /// Dying used to be invisible: PlayerDied went straight to Respawn, the
+    /// player was teleported and healed, and nothing on screen ever said so.
+    /// The world simply jumped. Reaching zero health is the most important
+    /// thing the game has to tell you, and it was the one thing it did not.
+    /// </summary>
+    private void OnPlayerDied()
+    {
+        if (DeathOverlay.Instance == null)
+        {
+            // No overlay in this scene - still better to respawn than to
+            // leave the player stuck at zero health.
+            Respawn();
+            return;
+        }
+
+        StartCoroutine(DieThenRespawn());
+    }
+
+    private System.Collections.IEnumerator DieThenRespawn()
+    {
+        yield return DeathOverlay.Instance.Show(LastCauseOfDeath);
+
+        Respawn();
+
+        LastCauseOfDeath = "";
+    }
+
+    /// <summary>
+    /// What killed the player, set by whatever did it so the death screen can
+    /// name it. "You died" with no cause teaches nothing.
+    /// </summary>
+    public static string LastCauseOfDeath { get; set; } = "";
 
     /// <summary>Sends the player back to the last anchor, or the scene start.</summary>
     public void Respawn()

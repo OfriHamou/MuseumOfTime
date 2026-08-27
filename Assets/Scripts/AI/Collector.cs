@@ -110,6 +110,9 @@ public sealed class Collector : MonoBehaviour
         // active, the erasing moment erodes Noa instead of the Collector.
         if (GameManager.Instance != null)
         {
+            RespawnService.LastCauseOfDeath =
+                "The erasing moment caught up with you. Hold CTRL to slow time.";
+
             GameManager.Instance.TakeDamage(Mathf.CeilToInt(erosionDamagePerSecond * Time.deltaTime));
         }
     }

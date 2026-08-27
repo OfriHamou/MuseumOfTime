@@ -284,6 +284,19 @@ public sealed class GameManager : MonoBehaviour
 
         NotifyStateChanged();
 
+        // Say what the power is FOR, at the moment it is handed over.
+        //
+        // Era travel was introduced as two keys and an energy cost and never
+        // once as a reason. "Why do I need to go to the past and the future?"
+        // is a fair question if nothing ever answers it - the answer is the
+        // whole premise, so it should be said out loud rather than left to be
+        // inferred from a puzzle three scenes later.
+        HudMessageFeed.Post(
+            "TIME LENS: the same place exists in three times. Q and R move " +
+            "between them - something lost in one era may still be there in " +
+            "another.",
+            HudMessageFeed.Tone.Good);
+
         Debug.Log("Time Lens acquired.", this);
     }
 

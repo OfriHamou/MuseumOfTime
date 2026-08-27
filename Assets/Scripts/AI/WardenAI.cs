@@ -60,6 +60,15 @@ public sealed class WardenAI : MonoBehaviour, IFreezable
              "instant re-acquire.")]
     [SerializeField] private float blindAfterCaptureSeconds = 3f;
 
+    [Tooltip("How close the Warden gets while chasing. Zero means it drives " +
+             "its destination to the player's exact position and stands " +
+             "inside them.")]
+    [SerializeField] private float chaseStopDistance = 1.4f;
+
+    [Tooltip("Seconds of unbroken chase before it gives up and goes back to " +
+             "its round. Without a limit it follows forever.")]
+    [SerializeField] private float maxChaseSeconds = 10f;
+
     [Header("Fairness")]
     [Tooltip("Seconds after the scene loads before this Warden hunts at all. " +
              "The opening seconds are for reading the objective, not for dying.")]
@@ -78,6 +87,7 @@ public sealed class WardenAI : MonoBehaviour, IFreezable
     private Vector3 lastKnownPosition;
     private float captureAllowedAt;
     private float blindUntil;
+    private float chaseUntil;
 
     /// <summary>How many times this Warden has caught Noa. Read by tests.</summary>
     public int CaptureCount { get; private set; }
@@ -253,6 +263,20 @@ public sealed class WardenAI : MonoBehaviour, IFreezable
             state = State.Chase;
             agent.speed = chaseSpeed;
 
+            // Keep its distance, and put a clock on the pursuit.
+            //
+            // stoppingDistance defaults to zero, so the agent's destination
+            // was the player's exact position - and the Warden has no collider
+            // to stop it, so it walked into Noa and stayed there. It read as
+            // being permanently glued to the player no matter where they ran.
+            //
+            // The clock matters just as much: chase speed is 4.6 against a
+            // walk speed of 4, and nothing ever ended a chase while the
+            // Warden could still see you, so walking away was impossible by
+            // construction.
+            agent.stoppingDistance = chaseStopDistance;
+            chaseUntil = Time.time + maxChaseSeconds;
+
             // Record the detection. GameManager.RegisterDetection has existed
             // since Phase 3 and nothing in the game ever called it - only a
             // debug tester did - so "Times Detected" on the victory screen was
@@ -338,11 +362,25 @@ public sealed class WardenAI : MonoBehaviour, IFreezable
             return;
         }
 
+        // Out of patience. It goes back to its round rather than following
+        // forever, which is what makes running away a thing that can work.
+        if (Time.time >= chaseUntil)
+        {
+            HudMessageFeed.Post("The Warden has lost interest", HudMessageFeed.Tone.Good);
+            GiveUpAndResumePatrol(blindAfterCaptureSeconds);
+            return;
+        }
+
         if (!CanSeePlayer())
         {
             // Lost them. Head for where they were, then give up.
             state = State.Search;
             searchUntil = Time.time + searchSeconds;
+
+            // Chase-only spacing has to come off here too, or the search
+            // never reaches its destination and the patrol stutters after.
+            agent.stoppingDistance = 0f;
+
             agent.SetDestination(lastKnownPosition);
             return;
         }
@@ -443,11 +481,7 @@ public sealed class WardenAI : MonoBehaviour, IFreezable
         //
         // Returning to patrol also reads correctly - a night guard who catches
         // someone escorts them out and resumes the round.
-        detection = 0f;
-        blindUntil = Time.time + blindAfterCaptureSeconds;
-        state = State.Patrol;
-        agent.speed = patrolSpeed;
-        GoToNextWaypoint();
+        GiveUpAndResumePatrol(blindAfterCaptureSeconds);
     }
 
     private void BeginPause()
@@ -483,15 +517,28 @@ public sealed class WardenAI : MonoBehaviour, IFreezable
     /// </summary>
     public void ReturnToPatrol(float blindSeconds = 4f)
     {
+        captureAllowedAt = Time.time + blindSeconds;
+        GiveUpAndResumePatrol(blindSeconds);
+    }
+
+    /// <summary>
+    /// Ends a pursuit: blind for a moment, stopping distance back to zero so
+    /// waypoints register again, and back on the round.
+    /// </summary>
+    private void GiveUpAndResumePatrol(float blindSeconds)
+    {
         detection = 0f;
         blindUntil = Time.time + blindSeconds;
-        captureAllowedAt = Time.time + blindSeconds;
         state = State.Patrol;
 
         if (agent != null && agent.isOnNavMesh)
         {
             agent.isStopped = false;
             agent.speed = patrolSpeed;
+
+            // Back to zero, or BeginPause fires a waypoint early and the
+            // patrol stutters.
+            agent.stoppingDistance = 0f;
         }
 
         GoToNextWaypoint();

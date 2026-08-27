@@ -160,6 +160,7 @@ public static class PremiumHudBuilder
         BuildObjectiveBanner(root, out TMP_Text objectiveText, out TMP_Text objectiveHint);
         BuildControlsCard(root);
         BuildMessageFeed(root);
+        BuildDeathOverlay(root);
         EnsureObjectiveTracker();
         StyleMinimapFrame(root);
         StylePauseMenu(root);
@@ -586,6 +587,70 @@ public static class PremiumHudBuilder
     /// silence - the number in the corner just went down, which reads as a bug
     /// rather than as something that happened to you.
     /// </summary>
+    /// <summary>
+    /// The death screen.
+    ///
+    /// Built last in the HUD so it sits on top of everything, and as a full
+    /// stretched panel so it genuinely covers the view - dying should not be
+    /// something the player has to notice.
+    /// </summary>
+    private static void BuildDeathOverlay(Transform root)
+    {
+        GameObject overlay = Child(root.gameObject, "DeathOverlay");
+        RectTransform ort = Rect(overlay);
+        Stretch(ort);
+
+        // Last sibling: on top of the bars, the objective and the minimap.
+        overlay.transform.SetAsLastSibling();
+
+        var group = Ensure<CanvasGroup>(overlay);
+        group.alpha = 0f;
+        group.interactable = false;
+        group.blocksRaycasts = false;
+
+        GameObject backdropGo = Child(overlay, "DeathBackdrop");
+        Stretch(Rect(backdropGo));
+        var backdrop = Ensure<Image>(backdropGo);
+        backdrop.color = new Color(0.06f, 0.02f, 0.04f, 0.92f);
+        backdrop.raycastTarget = false;
+
+        TMP_Text headline = Text(overlay, "DeathHeadline", "YOU DIED", 92f,
+                                 new Color(0.90f, 0.24f, 0.26f, 1f),
+                                 TextAlignmentOptions.Center);
+
+        RectTransform hrt = Rect(headline.gameObject);
+        hrt.anchorMin = hrt.anchorMax = new Vector2(0.5f, 0.5f);
+        hrt.pivot = new Vector2(0.5f, 0.5f);
+        hrt.anchoredPosition = new Vector2(0f, 60f);
+        hrt.sizeDelta = new Vector2(1000f, 130f);
+
+        TMP_Text detail = Text(overlay, "DeathDetail", "", 28f, Ink,
+                               TextAlignmentOptions.Center);
+
+        RectTransform drt = Rect(detail.gameObject);
+        drt.anchorMin = drt.anchorMax = new Vector2(0.5f, 0.5f);
+        drt.pivot = new Vector2(0.5f, 0.5f);
+        drt.anchoredPosition = new Vector2(0f, -60f);
+        drt.sizeDelta = new Vector2(1000f, 140f);
+        detail.textWrappingMode = TextWrappingModes.Normal;
+
+        var component = Ensure<DeathOverlay>(overlay);
+        var so = new SerializedObject(component);
+
+        Assign(so, "group", group);
+        Assign(so, "backdrop", backdrop);
+        Assign(so, "headlineText", headline);
+        Assign(so, "detailText", detail);
+
+        so.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    private static void Assign(SerializedObject so, string field, Object value)
+    {
+        SerializedProperty p = so.FindProperty(field);
+        if (p != null) { p.objectReferenceValue = value; }
+    }
+
     private static void BuildMessageFeed(Transform root)
     {
         GameObject feed = Child(root.gameObject, "MessageFeed");
