@@ -197,6 +197,19 @@ public sealed class PlayerInputReader : MonoBehaviour
         lookInput = Vector2.zero;
     }
 
+    /// <summary>
+    /// Injects a look value, for tests only.
+    ///
+    /// Mouse movement cannot be synthesised from a Play Mode test, so a test
+    /// that needs to prove look input SURVIVES a frame - rather than being
+    /// suppressed away by the camera rig's pointer-recentring fallback - has
+    /// no other way to put a value in.
+    /// </summary>
+    public void SetLookForTesting(Vector2 value)
+    {
+        lookInput = value;
+    }
+
     public void OnRun(InputAction.CallbackContext context)
     {
         isRunning = context.ReadValueAsButton();
