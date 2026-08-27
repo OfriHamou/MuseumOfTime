@@ -114,3 +114,8 @@ InitTestScene*.unity*
 /Build.log
 /playtest-report.txt
 /dev/
+
+# Build output and screenshots produced during verification
+/Build/
+/Assets/Screenshots/
+/Assets/Screenshots.meta

@@ -16,7 +16,20 @@ using UnityEngine.UI;
 /// </summary>
 public static class HudBuilder
 {
-    private const string ScenePath = "Assets/Scenes/MuseumNight.unity";
+    /// <summary>
+    /// Every gameplay scene, not just MuseumNight.
+    ///
+    /// This used to build the HUD in MuseumNight alone, which left FrozenCity
+    /// and ClockCore with no health/energy/shard readout, no EventSystem and
+    /// no pause menu at all - the player could not see their own state or
+    /// pause for two of the three scenes.
+    /// </summary>
+    private static readonly string[] ScenePaths =
+    {
+        "Assets/Scenes/MuseumNight.unity",
+        "Assets/Scenes/FrozenCity.unity",
+        "Assets/Scenes/ClockCore.unity",
+    };
 
     [MenuItem("Museum of Time/Build HUD and Pause Menu")]
     public static void BuildMenu() { Build(); }
@@ -25,7 +38,21 @@ public static class HudBuilder
 
     private static void Build()
     {
-        Scene scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+        foreach (string scenePath in ScenePaths)
+        {
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(scenePath) == null)
+            {
+                Debug.LogWarning("HUD: no scene at " + scenePath + ", skipped.");
+                continue;
+            }
+
+            BuildForScene(scenePath);
+        }
+    }
+
+    private static void BuildForScene(string scenePath)
+    {
+        Scene scene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
 
         MenuUIBuilder.EnsureEventSystem();
 
@@ -98,7 +125,7 @@ public static class HudBuilder
         GameObject player = GameObject.Find("Player");
         if (player == null)
         {
-            Debug.LogError("HUD FAILED: no Player in the scene.");
+            Debug.LogError("HUD FAILED: no Player in " + scene.name + ".");
             return;
         }
 
@@ -145,8 +172,9 @@ public static class HudBuilder
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
 
-        Debug.Log("HUD OK: health/energy/shards/era/items/detection meter, " +
-                   "pause menu with Resume/Restart/Controls/Main Menu/Quit.");
+        Debug.Log("HUD OK (" + scene.name + "): health/energy/shards/era/items/" +
+                   "detection meter, pause menu with Resume/Restart/Controls/" +
+                   "Main Menu/Quit.");
     }
 
     private static Image CreateBar(Transform canvas, string name, Color color, Vector2 anchoredPosition)

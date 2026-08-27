@@ -338,7 +338,16 @@ public static class ScenePolishBuilder
                      new Vector3(14f, 0f, 14f), new Vector3(-14f, 0f, 14f),
                      new Vector3(14f, 0f, -14f), new Vector3(-14f, 0f, -14f),
                      new Vector3(16f, 0f, 0f), new Vector3(-16f, 0f, 0f),
-                     new Vector3(0f, 0f, 16f), new Vector3(0f, 0f, -16f),
+                     new Vector3(0f, 0f, 16f),
+
+                     // Flanking the entrance rather than standing in it. A
+                     // single column used to sit at (0, 0, -16) - one metre in
+                     // front of the player spawn at (0, 0.1, -15) and directly
+                     // between the third-person camera and Noa. It went
+                     // unnoticed while the LOD models were importing at 1/100
+                     // scale (a 4 cm pebble); at their real 4 m it blocks half
+                     // the screen on the frame the scene opens.
+                     new Vector3(-4.5f, 0f, -16f), new Vector3(4.5f, 0f, -16f),
                  })
         {
             Prop(ColumnPrefab, root, p, Vector3.one, Vector3.zero);

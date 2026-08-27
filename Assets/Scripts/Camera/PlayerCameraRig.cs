@@ -1,5 +1,6 @@
 using Unity.Cinemachine;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// Owns the two gameplay cameras and switches between them.
@@ -35,11 +36,24 @@ public sealed class PlayerCameraRig : MonoBehaviour
     private const int InactivePriority = 0;
 
     private PlayerInputReader inputReader;
+    private PauseMenuController pauseMenu;
     private float pitch;
     private bool isFirstPerson;
 
     /// <summary>True while the first-person camera is the live one.</summary>
     public bool IsFirstPerson => isFirstPerson;
+
+    /// <summary>
+    /// True while gameplay should own the mouse - focused, and not paused.
+    /// </summary>
+    public bool CursorCaptureWanted { get; private set; }
+
+    /// <summary>
+    /// How many times the lock has had to be re-taken after something else
+    /// dropped it. Exposed so a test can prove the rig recovers rather than
+    /// locking once at startup and never again.
+    /// </summary>
+    public int CursorRecaptureCount { get; private set; }
 
     private void Awake()
     {
@@ -56,14 +70,12 @@ public sealed class PlayerCameraRig : MonoBehaviour
 
     private void OnEnable()
     {
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
+        CaptureCursor();
     }
 
     private void OnDisable()
     {
-        Cursor.lockState = CursorLockMode.None;
-        Cursor.visible = true;
+        ReleaseCursor();
     }
 
     private void Update()
@@ -79,6 +91,150 @@ public sealed class PlayerCameraRig : MonoBehaviour
         {
             ToggleCamera();
         }
+    }
+
+    private void LateUpdate()
+    {
+        EnforceCursorState();
+    }
+
+    /// <summary>
+    /// Re-applies the cursor lock whenever gameplay should own the mouse.
+    ///
+    /// Setting Cursor.lockState once in OnEnable is not enough, and this was
+    /// the bug that made the game unplayable: Unity DROPS the lock on its own
+    /// in several situations and never restores it.
+    ///
+    ///   - Alt-tabbing away, or clicking outside a windowed player, releases
+    ///     it. Focus coming back does not re-apply it.
+    ///   - In the Editor, pressing Escape releases it unconditionally - and
+    ///     Escape is also the Pause binding.
+    ///   - A lock requested before the window actually has focus (which is
+    ///     exactly when OnEnable runs on the first frame of Play) is silently
+    ///     dropped.
+    ///
+    /// Once released, nothing re-locked it, so the mouse ran off the window
+    /// and looking around stopped working entirely for the rest of the
+    /// session. Re-asserting it every frame is the standard fix.
+    ///
+    /// It deliberately does NOT fight the pause menu or an unfocused window,
+    /// so Escape still frees the mouse to click Resume, and alt-tab still
+    /// works.
+    /// </summary>
+    private void EnforceCursorState()
+    {
+        // Paused is the ONLY reason gameplay gives the mouse back.
+        //
+        // A previous version also released whenever Application.isFocused was
+        // false. That was wrong in two ways: Unity already drops the OS lock
+        // by itself when the window loses focus, so forcing it achieves
+        // nothing; and isFocused reads false during the first frames of a
+        // freshly launched player, so the rig was actively fighting its own
+        // lock exactly when the player was trying to start playing.
+        CursorCaptureWanted = !IsPaused();
+
+        if (CursorCaptureWanted)
+        {
+            if (Cursor.lockState != CursorLockMode.Locked || Cursor.visible)
+            {
+                CaptureCursor();
+                CursorRecaptureCount++;
+            }
+        }
+        else if (Cursor.lockState != CursorLockMode.None)
+        {
+            ReleaseCursor();
+        }
+
+        KeepPointerOffTheEdge();
+    }
+
+    /// <summary>
+    /// Fallback for when the OS refuses to hold the lock: warp the pointer
+    /// back to the middle of the window every frame.
+    ///
+    /// Re-asserting CursorLockMode.Locked is the correct fix and is what
+    /// normally runs, but it is not guaranteed - the Editor only honours a
+    /// lock while the Game view is the focused pane, and some window managers
+    /// and remote-desktop sessions drop it outright. Whenever that happens the
+    /// pointer is free to slide to the edge of the physical screen, and at the
+    /// edge the OS stops producing movement: Mouse/delta goes to zero and the
+    /// camera simply stops turning part-way round. That is the "I can't look
+    /// all the way around, the scrolling stops" symptom exactly.
+    ///
+    /// Keeping the pointer pinned to the centre means it can never reach an
+    /// edge, so delta keeps arriving and yaw stays unbounded whether or not
+    /// the lock is actually held.
+    /// </summary>
+    private void KeepPointerOffTheEdge()
+    {
+        if (!CursorCaptureWanted || Cursor.lockState == CursorLockMode.Locked)
+        {
+            return;
+        }
+
+        Mouse mouse = Mouse.current;
+
+        if (mouse == null)
+        {
+            return;
+        }
+
+        var centre = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+        Vector2 position = mouse.position.ReadValue();
+
+        // Only warp once the pointer is actually drifting outward, so the
+        // per-frame warp cannot fight a still mouse or add jitter.
+        float margin = Mathf.Min(Screen.width, Screen.height) * 0.25f;
+
+        if (Mathf.Abs(position.x - centre.x) < margin &&
+            Mathf.Abs(position.y - centre.y) < margin)
+        {
+            return;
+        }
+
+        mouse.WarpCursorPosition(centre);
+
+        // A warp can surface as one large synthetic delta on the next read.
+        // Dropping that frame's look keeps the view from snapping.
+        if (inputReader != null)
+        {
+            inputReader.SuppressLookThisFrame();
+        }
+    }
+
+    /// <summary>
+    /// Focus coming back is the moment Unity has just discarded the lock, so
+    /// it is re-taken immediately rather than a frame later.
+    /// </summary>
+    private void OnApplicationFocus(bool hasFocus)
+    {
+        if (hasFocus && enabled)
+        {
+            EnforceCursorState();
+        }
+    }
+
+    private bool IsPaused()
+    {
+        if (pauseMenu == null)
+        {
+            pauseMenu = FindAnyObjectByType<PauseMenuController>();
+        }
+
+        return pauseMenu != null && pauseMenu.IsPaused;
+    }
+
+    private static void CaptureCursor()
+    {
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+    }
+
+    private static void ReleaseCursor()
+    {
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
     }
 
     private void HandleLook()

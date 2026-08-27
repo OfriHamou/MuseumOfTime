@@ -19,7 +19,12 @@ using UnityEngine;
 [RequireComponent(typeof(Collider))]
 public sealed class Collector : MonoBehaviour
 {
-    private enum Stage
+    /// <summary>
+    /// Public so the on-screen objective can tell the player which era the
+    /// fight currently needs - without that, the three-phase boss is a wall
+    /// with no readable rule.
+    /// </summary>
+    public enum Stage
     {
         Shielded,
         Present,
@@ -44,6 +49,9 @@ public sealed class Collector : MonoBehaviour
 
     /// <summary>True once all three phases are cleared.</summary>
     public bool IsDefeated => stage == Stage.Defeated;
+
+    /// <summary>Which phase the fight is in right now.</summary>
+    public Stage CurrentStage => stage;
 
     private void Awake()
     {
