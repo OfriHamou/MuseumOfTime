@@ -586,6 +586,38 @@ inside the same frame and the net delta is exactly zero.
 `PlayerCameraRig.FreeCursorForPlaytest` exists solely so a tool can drive the
 camera; it defaults to false and nothing in the game sets it.
 
+### Look sensitivity: 0.12 was too slow to be usable
+
+Separate from the suppression bug above, and the last piece of the same
+complaint.
+
+At 0.12 degrees per unit of mouse delta, turning around meant dragging the
+mouse across the mat several times - and a desk runs out of room, so the view
+appears to stop turning even though nothing in the code limits yaw at all.
+"It reaches a limit" is what a too-slow sensitivity feels like once the mat
+runs out.
+
+Now 0.35. Measured in play: a 100 px flick turns roughly 46 degrees, against
+about 12 before, so a full turn is one comfortable sweep instead of four.
+
+Worth noting where this had to change. `mouseSensitivity` is a
+`[SerializeField]`, so every scene and the Player prefab carry their own saved
+copy - editing the field initialiser alone changes nothing that ships.
+`CameraRigParityBuilder` now writes the value during the rebuild, which is
+what actually moves it in all three scenes, and the prefab was updated too.
+
+### A playtest flag that leaked into the test run
+
+`PlayerCameraRig.FreeCursorForPlaytest` exists so a tool can drive the camera,
+because a locked cursor takes its delta from raw input and cannot be steered
+by synthetic absolute positioning.
+
+It is a static, so setting it once to play by hand left it set for the whole
+Editor script domain - through every later play session and every test run.
+Four CursorLockTests failed because the rig had been told half an hour earlier
+not to capture the cursor. It now clears itself on `SubsystemRegistration`,
+which runs before the first scene loads on every entry to play mode.
+
 ### The Warden killed the player fifteen seconds into a new game
 
 Pressing New Game and standing still was fatal. MuseumNight spawns the player

@@ -32,6 +32,13 @@ public static class CameraRigParityBuilder
 
     public static void BuildFromCommandLine() { Build(); }
 
+    /// <summary>
+    /// Degrees per unit of mouse delta. At the old 0.12 a full turn needed
+    /// several drags across the mat, and running out of desk reads exactly
+    /// like the view refusing to turn.
+    /// </summary>
+    private const float LookSensitivity = 0.35f;
+
     private static void Build()
     {
         foreach (string scenePath in ScenePaths)
@@ -129,6 +136,15 @@ public static class CameraRigParityBuilder
         so.FindProperty("firstPersonCamera").objectReferenceValue = fpCam;
         so.FindProperty("thirdPersonCamera").objectReferenceValue = tpCam;
         so.FindProperty("cameraPivot").objectReferenceValue = pivot;
+
+        // Written here, not just left to the C# default.
+        //
+        // Every scene carries its own serialised copy of this value, so
+        // changing the field initialiser alone changes nothing that ships -
+        // the prefab and all three scenes keep whatever was saved. Setting it
+        // during the rebuild is what actually moves it.
+        so.FindProperty("mouseSensitivity").floatValue = LookSensitivity;
+
         so.ApplyModifiedPropertiesWithoutUndo();
 
         EditorUtility.SetDirty(rig);
