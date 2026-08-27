@@ -13,6 +13,10 @@ public sealed class WorldObjectiveText : MonoBehaviour
     private TextMeshPro label;
     private string lastObjective;
 
+    [Tooltip("Closer than this and the line fades out, so a wide world quad " +
+             "cannot fill the screen when the player walks into it.")]
+    [SerializeField] private float nearFadeDistance = 3.2f;
+
     private void Awake()
     {
         label = GetComponent<TextMeshPro>();
@@ -32,6 +36,16 @@ public sealed class WorldObjectiveText : MonoBehaviour
         if (cam != null)
         {
             transform.rotation = Quaternion.LookRotation(transform.position - cam.transform.position);
+
+            // Fade out at close range. This is a wide world-space quad, so
+            // from a couple of metres away perspective turns it into letters
+            // that span the screen and hide the room behind them.
+            float toCamera = Vector3.Distance(transform.position, cam.transform.position);
+            float half = nearFadeDistance * 0.5f;
+
+            label.alpha = toCamera >= nearFadeDistance
+                ? 1f
+                : Mathf.Clamp01((toCamera - half) / half);
         }
     }
 }

@@ -356,7 +356,18 @@ public static class NavigationBuilder
         GameObject warden = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         warden.name = "TimeWarden";
         warden.transform.SetParent(enemies.transform, false);
-        warden.transform.position = new Vector3(-6f, 1.1f, -6f);
+        // The north side of the hall: away from the spawn AND off the route.
+        //
+        // It used to start at (-6, -6) and patrol a rectangle enclosing the
+        // player's spawn at (0,0) and both Time Shards - a new game began with
+        // a guard already looking at you from 8.5 m. Moving it to the west
+        // wing fixed that and created a worse problem, because the only ramp
+        // to the mezzanine is in the west corner, so the guard was then parked
+        // on the single route the objective sends you down.
+        //
+        // North it is: it crosses the hall, so it is a real presence to avoid,
+        // but it neither camps the spawn nor blocks the way up.
+        warden.transform.position = new Vector3(-4f, 1.1f, 8f);
         Object.DestroyImmediate(warden.GetComponent<CapsuleCollider>());
 
         NavMeshAgent wardenAgent = warden.AddComponent<NavMeshAgent>();
@@ -369,16 +380,27 @@ public static class NavigationBuilder
         route.SetWaypoints(new List<PatrolRoute.Waypoint>
         {
             new PatrolRoute.Waypoint
-            { position = new Vector3(-6f, 0f, -6f), waitSeconds = 2.5f },
+            { position = new Vector3(-4f, 0f, 8f), waitSeconds = 2.5f },
             new PatrolRoute.Waypoint
-            { position = new Vector3(-6f, 0f, 6f), waitSeconds = 3f },
+            { position = new Vector3(6f, 0f, 8f), waitSeconds = 3f },
             new PatrolRoute.Waypoint
-            { position = new Vector3(4f, 0f, 6f), waitSeconds = 2.5f },
+            { position = new Vector3(6f, 0f, 2f), waitSeconds = 2.5f },
             new PatrolRoute.Waypoint
-            { position = new Vector3(4f, 0f, -6f), waitSeconds = 3f },
+            { position = new Vector3(-4f, 0f, 2f), waitSeconds = 3f },
         });
 
-        warden.AddComponent<WardenAI>();
+        WardenAI wardenAi = warden.AddComponent<WardenAI>();
+
+        // MuseumNight is the teaching scene, so a capture here has to be
+        // survivable several times over. At 25 damage with a 3 s cooldown the
+        // player was dead about fifteen seconds into a new game.
+        var wardenSo = new SerializedObject(wardenAi);
+        wardenSo.FindProperty("captureDamage").intValue = 12;
+        wardenSo.FindProperty("captureScorePenalty").intValue = 25;
+        wardenSo.FindProperty("captureCooldown").floatValue = 5f;
+        wardenSo.FindProperty("huntDelaySeconds").floatValue = 12f;
+        wardenSo.FindProperty("viewDistance").floatValue = 11f;
+        wardenSo.ApplyModifiedPropertiesWithoutUndo();
 
         // The Animator authored by WardenAnimatorBuilder, plus the driver
         // that feeds it from the AI state.

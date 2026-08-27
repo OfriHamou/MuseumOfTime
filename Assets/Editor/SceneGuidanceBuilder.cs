@@ -42,10 +42,99 @@ public static class SceneGuidanceBuilder
 
     private static void Build()
     {
+        BuildMuseumNight();
         BuildFrozenCity();
         BuildClockCore();
 
         Debug.Log("=== SCENE GUIDANCE COMPLETE ===");
+    }
+
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// Signposts the one route out of MuseumNight.
+    ///
+    /// The objective says to reach the curator's office up on the mezzanine.
+    /// The only way up is a single unlit ramp in the far WEST corner of a dark
+    /// thirty-metre hall, while the office itself is at the east end - so a
+    /// player follows the objective, walks east, finds no way up, and is
+    /// stuck. Playing it, that is exactly what happened: several minutes of
+    /// wandering a room that gave no indication of where the stairs were.
+    ///
+    /// A lit sign at the foot of the ramp and another at the top turn "find
+    /// the stairs" back into a thing you can actually do.
+    /// </summary>
+    private static void BuildMuseumNight()
+    {
+        const string path = "Assets/Scenes/MuseumNight.unity";
+        if (AssetDatabase.LoadAssetAtPath<SceneAsset>(path) == null) { return; }
+
+        Scene scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
+
+        GameObject signs = Root("Wayfinding");
+
+        Signpost(signs, "Sign_RampFoot",
+                 new Vector3(-12.2f, 2.4f, -5.0f),
+                 "<color=#FFD98A>RAMP TO THE MEZZANINE</color>\nThe Time Lens is up here");
+
+        Signpost(signs, "Sign_RampTop",
+                 new Vector3(-12.2f, 7.2f, 1.5f),
+                 "<color=#FFD98A>CURATOR'S OFFICE</color>\nFollow the mezzanine EAST");
+
+        Signpost(signs, "Sign_OfficeDoor",
+                 new Vector3(7.4f, 7.2f, 6.0f),
+                 "<color=#FFD98A>CURATOR'S OFFICE</color>\nThe Time Lens is inside");
+
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+
+        Debug.Log("WAYFINDING OK: MuseumNight signposted (3 signs)");
+    }
+
+    /// <summary>
+    /// A world-space sign with its own light, so it reads in a dark room.
+    /// </summary>
+    private static void Signpost(GameObject parent, string name, Vector3 where, string message)
+    {
+        GameObject go = Child(parent, name);
+        go.transform.position = where;
+
+        Text(go, message);
+
+        // A signpost keeps the words it was given. WorldObjectiveText also
+        // billboards, but it REWRITES the text with the current objective, so
+        // using it here turned every sign into a screen-wide copy of the
+        // objective line instead of the direction it was placed to give.
+        Ensure<WorldSignpost>(go);
+
+        // Signs sit close to eye level and are read at a couple of metres, so
+        // the plaque-sized range is right. The 2.2 the shared Text() helper
+        // uses is for text meant to be read across a room.
+        var tmp = go.GetComponent<TMPro.TextMeshPro>();
+        if (tmp != null)
+        {
+            tmp.fontSizeMin = 0.28f;
+            tmp.fontSizeMax = 0.62f;
+
+            var rt = go.GetComponent<RectTransform>();
+            if (rt != null) { rt.sizeDelta = new Vector2(4.4f, 1.5f); }
+        }
+
+        Transform existingGlow = go.transform.Find("SignGlow");
+        if (existingGlow != null) { Object.DestroyImmediate(existingGlow.gameObject); }
+
+        var glow = new GameObject("SignGlow");
+        glow.transform.SetParent(go.transform, false);
+        glow.transform.localPosition = Vector3.zero;
+
+        Light light = glow.AddComponent<Light>();
+        light.type = LightType.Point;
+        light.color = new Color(1f, 0.85f, 0.55f);
+        light.intensity = 9f;
+        light.range = 12f;
+        light.shadows = LightShadows.None;
+
+        go.SetActive(true);
     }
 
     // ------------------------------------------------------------------

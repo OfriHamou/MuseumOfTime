@@ -97,6 +97,21 @@ public sealed class PlayerCameraRig : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Playtest escape hatch. Defaults to false and nothing in the game ever
+    /// sets it - it exists purely so a human or a tool driving the Editor can
+    /// steer the camera.
+    ///
+    /// A locked cursor takes its look delta from raw mouse input, which
+    /// SetCursorPos does not generate: the lock snaps the pointer back to the
+    /// centre within the same frame, so a synthetic absolute move nets a delta
+    /// of exactly zero and the view will not turn at all. A real mouse is
+    /// unaffected. Releasing the lock makes position changes readable as
+    /// deltas again, which is what allows the game to be driven and played
+    /// through end to end rather than only asserted about.
+    /// </summary>
+    public static bool FreeCursorForPlaytest;
+
     private void LateUpdate()
     {
         EnforceCursorState();
@@ -135,7 +150,7 @@ public sealed class PlayerCameraRig : MonoBehaviour
         // nothing; and isFocused reads false during the first frames of a
         // freshly launched player, so the rig was actively fighting its own
         // lock exactly when the player was trying to start playing.
-        CursorCaptureWanted = !IsPaused();
+        CursorCaptureWanted = !IsPaused() && !FreeCursorForPlaytest;
 
         if (CursorCaptureWanted)
         {
@@ -172,26 +187,30 @@ public sealed class PlayerCameraRig : MonoBehaviour
     /// </summary>
     private void KeepPointerOffTheEdge()
     {
-        if (!CursorCaptureWanted)
+        // This is a FALLBACK, and it must stay one.
+        //
+        // When the OS is genuinely holding the lock the pointer is pinned at
+        // the centre of the window and cannot reach an edge, so there is
+        // nothing here to fix. Running anyway is not merely redundant - it is
+        // the bug. On any frame where the reported position sits outside the
+        // margin this method warps AND calls SuppressLookThisFrame, which
+        // throws away the very look input it exists to protect. Small mouse
+        // movements stay inside the margin and work; large sweeps get eaten.
+        // That is precisely the reported symptom: the view turns a little and
+        // then refuses to turn any further.
+        //
+        // Found by playing the game rather than by reasoning about it. An
+        // earlier version of this method did return early on a held lock; I
+        // removed that guard on the strength of an Input System issue saying
+        // the lock can be reported as held while delta has already died at the
+        // window edge. That reading was plausible and it was wrong here:
+        // driving the real build showed the lock genuinely holds - the OS
+        // cursor reports dead centre after every move - so the guard was never
+        // the thing breaking the look. Removing it was.
+        if (!CursorCaptureWanted || Cursor.lockState == CursorLockMode.Locked)
         {
             return;
         }
-
-        // Note what is NOT checked here: whether the lock is currently held.
-        //
-        // An earlier version returned early when lockState was Locked, on the
-        // reasoning that a held lock already pins the pointer and warping it
-        // would be redundant. That reasoning skipped the exact case this
-        // method exists for. The documented failure is that the pointer
-        // reaches the window edge, the OS stops producing movement, and the
-        // lock is dropped - and lockState is a request, not a reading of what
-        // the OS is actually doing, so it can still say Locked while delta has
-        // already gone to zero on that axis. Bailing out on it meant the
-        // fallback never ran in the one situation it was written for.
-        //
-        // Warping when the lock genuinely holds costs nothing: a held lock
-        // keeps the reported position at the centre, so the margin test below
-        // never trips and no warp is issued.
 
         Mouse mouse = Mouse.current;
 

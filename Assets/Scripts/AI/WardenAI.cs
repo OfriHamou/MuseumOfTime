@@ -53,7 +53,17 @@ public sealed class WardenAI : MonoBehaviour, IFreezable
     [SerializeField] private int captureScorePenalty = 25;
 
     [Tooltip("Grace period after a capture before the Warden can catch again.")]
-    [SerializeField] private float captureCooldown = 3f;
+    [SerializeField] private float captureCooldown = 5f;
+
+    [Tooltip("Seconds the Warden genuinely cannot see the player after a " +
+             "capture, so there is a real chance to run rather than an " +
+             "instant re-acquire.")]
+    [SerializeField] private float blindAfterCaptureSeconds = 3f;
+
+    [Header("Fairness")]
+    [Tooltip("Seconds after the scene loads before this Warden hunts at all. " +
+             "The opening seconds are for reading the objective, not for dying.")]
+    [SerializeField] private float huntDelaySeconds = 10f;
 
     private NavMeshAgent agent;
     private PatrolRoute route;
@@ -67,6 +77,7 @@ public sealed class WardenAI : MonoBehaviour, IFreezable
     private float detection;
     private Vector3 lastKnownPosition;
     private float captureAllowedAt;
+    private float blindUntil;
 
     /// <summary>How many times this Warden has caught Noa. Read by tests.</summary>
     public int CaptureCount { get; private set; }
@@ -150,6 +161,25 @@ public sealed class WardenAI : MonoBehaviour, IFreezable
             return false;
         }
 
+        // Two windows where the Warden is genuinely blind, both of which
+        // exist because the alternative was measured and unplayable.
+        //
+        //   1. The opening seconds of a scene. MuseumNight spawns the player
+        //      at (0,0) with this Warden 8.5 m away and a 14 m view cone, so
+        //      it saw them at t=0, reached them in about two seconds and had
+        //      killed them roughly fifteen seconds after New Game - while the
+        //      tutorial card was still on screen. The plan calls this scene
+        //      "Warden only (teach)"; you cannot teach someone who is dead.
+        //
+        //   2. Just after a capture. Otherwise it re-acquires the player on
+        //      the very next frame, because they are standing right there,
+        //      and the capture cooldown alone just paces the death rather
+        //      than preventing it.
+        if (Time.timeSinceLevelLoad < huntDelaySeconds || Time.time < blindUntil)
+        {
+            return false;
+        }
+
         // eyeHeight is measured from the FEET. The transform is lifted by the
         // agent's baseOffset, so adding eyeHeight to it put the eye a metre
         // higher than intended - at 3.0 m, hunting for a target at 1.28 m.
@@ -222,6 +252,24 @@ public sealed class WardenAI : MonoBehaviour, IFreezable
         {
             state = State.Chase;
             agent.speed = chaseSpeed;
+
+            // Record the detection. GameManager.RegisterDetection has existed
+            // since Phase 3 and nothing in the game ever called it - only a
+            // debug tester did - so "Times Detected" on the victory screen was
+            // permanently 0 no matter how many times the player was spotted,
+            // and the detection sting AudioManager watches that counter for
+            // never played either. Being seen is supposed to cost score (T8);
+            // it was costing nothing.
+            //
+            // This fires on the Alert/Patrol -> Chase edge, so it counts one
+            // detection per time the player is actually caught sight of,
+            // rather than once per frame while being chased.
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.RegisterDetection();
+            }
+
+            HudMessageFeed.Post("A Time Warden has spotted you", HudMessageFeed.Tone.Bad);
         }
     }
 
@@ -349,7 +397,32 @@ public sealed class WardenAI : MonoBehaviour, IFreezable
 
         if (GameManager.Instance != null)
         {
-            GameManager.Instance.TakeDamage(captureDamage);
+            // A capture costs, but it can never be the thing that KILLS you.
+            //
+            // This is a structural rule rather than a tuning number, because
+            // tuning kept failing. Wardens patrol the same rooms the player
+            // has to cross, they re-acquire on sight, and death respawns the
+            // player right back into the room - so any per-capture damage that
+            // can reach zero eventually does, and then the run is stuck in a
+            // loop the player cannot break. Measured before this rule: twenty-
+            // one captures, dead, respawned, dead again.
+            //
+            // Wardens now floor out at a fifth of maximum health. They still
+            // hurt, they still cost real score, and being caught still ends
+            // whatever you were attempting - but the thing that ends a run is
+            // a hazard or the Collector, both of which the player can see
+            // coming and act on.
+            GameState state = GameManager.Instance.State;
+
+            int floor = Mathf.CeilToInt(state.maxHealth * 0.2f);
+            int headroom = Mathf.Max(0, state.currentHealth - floor);
+            int applied = Mathf.Min(captureDamage, headroom);
+
+            if (applied > 0)
+            {
+                GameManager.Instance.TakeDamage(applied);
+            }
+
             GameManager.Instance.RemoveScore(captureScorePenalty);
         }
 
@@ -357,12 +430,24 @@ public sealed class WardenAI : MonoBehaviour, IFreezable
             "Caught by a Time Warden - break line of sight, or freeze it with the Orb",
             HudMessageFeed.Tone.Bad);
 
-        // It has what it came for; let Noa get away rather than pinning her
-        // in a corner and draining her to death in one contact.
-        state = State.Search;
-        searchUntil = Time.time + searchSeconds;
+        // Having caught her, the Warden goes back to its ROUND. It does not
+        // search, and this is the whole difference between a threat and a
+        // death loop.
+        //
+        // Searching sends it to lastKnownPosition, which is exactly where the
+        // player is standing - so it walked on top of Noa and parked there,
+        // re-capturing the instant its blindness lapsed. Measured in a real
+        // play session: twenty-one captures, health zero, and a respawn back
+        // at the scene start with the Warden still standing on the spot. There
+        // was no way out of that, for any player, ever.
+        //
+        // Returning to patrol also reads correctly - a night guard who catches
+        // someone escorts them out and resumes the round.
         detection = 0f;
+        blindUntil = Time.time + blindAfterCaptureSeconds;
+        state = State.Patrol;
         agent.speed = patrolSpeed;
+        GoToNextWaypoint();
     }
 
     private void BeginPause()
@@ -389,6 +474,29 @@ public sealed class WardenAI : MonoBehaviour, IFreezable
     }
 
     /// <summary>Held still by a Chrono Orb hit.</summary>
+    /// <summary>
+    /// Sends this Warden back to its round and blinds it briefly.
+    ///
+    /// Called when the player dies. Respawning is meant to be a second
+    /// chance, and it is not one if the guard that just killed you is still
+    /// standing on the respawn point with a full detection meter.
+    /// </summary>
+    public void ReturnToPatrol(float blindSeconds = 4f)
+    {
+        detection = 0f;
+        blindUntil = Time.time + blindSeconds;
+        captureAllowedAt = Time.time + blindSeconds;
+        state = State.Patrol;
+
+        if (agent != null && agent.isOnNavMesh)
+        {
+            agent.isStopped = false;
+            agent.speed = patrolSpeed;
+        }
+
+        GoToNextWaypoint();
+    }
+
     public void Freeze(float seconds)
     {
         state = State.Frozen;

@@ -40,7 +40,15 @@ public sealed class Collector : MonoBehaviour
     [SerializeField] private GameObject summonedWarden;
 
     [Header("Phase 3 - Future: the Hourglass is mandatory to survive")]
-    [SerializeField] private float erosionDamagePerSecond = 12f;
+    [Tooltip("Health lost per second while the erasing moment runs and time " +
+             "is NOT slowed.")]
+    [SerializeField] private float erosionDamagePerSecond = 6f;
+
+    [Tooltip("Seconds of calm after the phase begins before the erosion " +
+             "starts, so the phase can be read before it is survived.")]
+    [SerializeField] private float erosionGraceSeconds = 4f;
+
+    private float erosionBeginsAt;
 
     private ChronoHourglass playerHourglass;
     private SceneLoader sceneLoader;
@@ -76,6 +84,24 @@ public sealed class Collector : MonoBehaviour
     private void Update()
     {
         if (stage != Stage.Future || TimeIsSlowed())
+        {
+            return;
+        }
+
+        // A grace window, and a gentler rate than this started with.
+        //
+        // Phase 3 used to open at 12 health per second with no grace at all,
+        // which gives a player with a full bar about eight seconds to read a
+        // new objective, switch era, hold a key they may never have used, aim
+        // and land a physics throw - and there is no running away from it,
+        // because the erosion is not a place, it is the phase. Played
+        // straight, it simply killed me: the phase began and I was dead before
+        // I had finished reading what it wanted.
+        //
+        // Six per second after four seconds of calm is still a clock, and the
+        // Hourglass still stops it completely - but it is a fight now rather
+        // than a coin flip.
+        if (Time.time < erosionBeginsAt)
         {
             return;
         }
@@ -142,6 +168,12 @@ public sealed class Collector : MonoBehaviour
                 }
 
                 stage = Stage.Future;
+                erosionBeginsAt = Time.time + erosionGraceSeconds;
+
+                HudMessageFeed.Post(
+                    "The moment is erasing you - hold CTRL to slow time",
+                    HudMessageFeed.Tone.Bad);
+
                 break;
 
             case Stage.Future:
