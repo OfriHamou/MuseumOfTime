@@ -64,6 +64,11 @@ public sealed class FallGuardTests
         var respawn = Object.FindFirstObjectByType<RespawnService>();
         Assert.IsNotNull(respawn, "MuseumNight has no RespawnService.");
 
+        // Arm an anchor, so this test is about the FALL being caught rather
+        // than about the game-over path. Without one, a death correctly ends
+        // the run and sends the player to the menu instead of respawning.
+        GameManager.Instance.SaveCheckpoint("MuseumNight", new Vector3(0f, 1f, 0f));
+
         int respawnsBefore = respawn.RespawnCount;
 
         // Drop the player through the floor, the way jumping over the wall does.

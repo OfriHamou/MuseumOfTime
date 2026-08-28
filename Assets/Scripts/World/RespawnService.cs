@@ -14,6 +14,12 @@ public sealed class RespawnService : MonoBehaviour
 
     [SerializeField] private Transform sceneStart;
     [SerializeField] private int scorePenalty = 40;
+
+    [Tooltip("Dying again within this long of a respawn means the place they " +
+             "were sent to is not safe, so the run ends instead of looping.")]
+    [SerializeField] private float unsafeRespawnSeconds = 4f;
+
+    private float lastRespawnAt = -999f;
     [SerializeField] private float energyOnRespawn = 60f;
 
     /// <summary>How many times the player has been sent back.</summary>
@@ -66,11 +72,62 @@ public sealed class RespawnService : MonoBehaviour
 
     private System.Collections.IEnumerator DieThenRespawn()
     {
-        yield return DeathOverlay.Instance.Show(LastCauseOfDeath);
+        // A death is a GAME OVER unless there is somewhere earned to go back
+        // to.
+        //
+        // T21 wants failure to return the player to their last Time Anchor,
+        // and it still does - but anchors only exist from FrozenCity onward,
+        // so in the museum there is nothing to return to and "respawn" just
+        // meant being dropped back where you started with no acknowledgement
+        // that you had died at all.
+        //
+        // The second condition catches the other half of the problem: if the
+        // player dies again within moments of coming back, the place they were
+        // sent to is not safe, and sending them there again just loops. End
+        // the run instead of looping it.
+        bool haveAnchor = GameManager.Instance != null &&
+                          GameManager.Instance.State.hasCheckpoint;
 
-        Respawn();
+        bool diedRightAfterRespawning =
+            RespawnCount > 0 &&
+            Time.unscaledTime - lastRespawnAt < unsafeRespawnSeconds;
+
+        bool gameOver = !haveAnchor || diedRightAfterRespawning;
+
+        yield return DeathOverlay.Instance.Show(LastCauseOfDeath, gameOver);
 
         LastCauseOfDeath = "";
+
+        if (gameOver)
+        {
+            GameOver();
+            yield break;
+        }
+
+        Respawn();
+    }
+
+    /// <summary>
+    /// Ends the run and returns to the main menu.
+    /// </summary>
+    private void GameOver()
+    {
+        if (GameManager.Instance != null)
+        {
+            // So the menu's Continue button does not drop them straight back
+            // into a dead state.
+            GameManager.Instance.ResetGame();
+        }
+
+        var loader = FindFirstObjectByType<SceneLoader>();
+
+        if (loader != null)
+        {
+            loader.LoadMainMenu();
+            return;
+        }
+
+        UnityEngine.SceneManagement.SceneManager.LoadScene("MainMenu");
     }
 
     /// <summary>
@@ -132,6 +189,7 @@ public sealed class RespawnService : MonoBehaviour
 
         ClearTheAreaOfHunters();
 
+        lastRespawnAt = Time.unscaledTime;
         RespawnCount++;
     }
 
@@ -167,6 +225,15 @@ public sealed class RespawnService : MonoBehaviour
     /// </summary>
     private static void Teleport(GameObject player, Vector3 destination)
     {
+        // Drop any speed the fall built up first, or the character is placed
+        // correctly and then driven straight back through the floor.
+        var movement = player.GetComponent<PlayerController>();
+
+        if (movement != null)
+        {
+            movement.ResetFallVelocity();
+        }
+
         var controller = player.GetComponent<CharacterController>();
 
         if (controller != null)
