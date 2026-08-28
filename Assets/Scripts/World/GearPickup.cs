@@ -21,8 +21,14 @@ public sealed class GearPickup : MonoBehaviour, IInteractable
             renderer.enabled = inPast;
         }
 
-        Collider collider = GetComponent<Collider>();
-        if (collider != null)
+        // EVERY collider, not just the first.
+        //
+        // GetComponent returns one, and repeated rebuilds had left eighteen on
+        // this object - including a 2.2 x 5.9 m box. Seventeen of them stayed
+        // enabled in every era, so the "missing" gear was still a solid,
+        // invisible, six-metre wall standing in the street in the Present and
+        // the Future.
+        foreach (Collider collider in GetComponents<Collider>())
         {
             collider.enabled = inPast;
         }
