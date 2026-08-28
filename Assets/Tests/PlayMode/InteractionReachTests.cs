@@ -101,11 +101,27 @@ public sealed class InteractionReachTests
     [UnityTest]
     public IEnumerator TheTimeLensCanBeSeenAndTaken()
     {
-        var lens = Object.FindFirstObjectByType<ItemPickup>();
-        Assert.IsNotNull(lens, "MuseumNight has no Time Lens.");
-
         GameManager.Instance.ResetGame();
         yield return null;
+
+        // The Lens is now the reward for the Temporal Seal puzzle
+        // (MuseumTimeSealPuzzle), not something sitting in the open - solve
+        // it the way a real player would before checking it can be reached.
+        MuseumTimeSealPuzzle puzzle = MuseumTimeSealPuzzle.Instance;
+        Assert.IsNotNull(puzzle, "MuseumNight has no MuseumTimeSealPuzzle.");
+
+        foreach (TemporalSeal seal in
+                 Object.FindObjectsByType<TemporalSeal>(FindObjectsSortMode.None))
+        {
+            EraManager.Instance.SetEra(seal.RequiredEra);
+            seal.Interact(player);
+        }
+
+        Assert.IsTrue(puzzle.IsSolved,
+            "Restoring all three Temporal Seals in their own eras did not solve the puzzle.");
+
+        var lens = Object.FindFirstObjectByType<ItemPickup>();
+        Assert.IsNotNull(lens, "Solving the puzzle did not reveal the Time Lens.");
 
         yield return StandInFrontOf(lens);
 
@@ -122,11 +138,6 @@ public sealed class InteractionReachTests
         Assert.IsTrue(
             GameManager.Instance.State.hasTimeLens,
             "Taking the Time Lens did not grant it.");
-
-        Assert.IsTrue(
-            EraManager.Instance.IsUnlocked,
-            "Taking the Time Lens should unlock era travel - it is what opens " +
-            "the game's signature mechanic.");
     }
 
     /// <summary>

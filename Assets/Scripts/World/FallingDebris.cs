@@ -143,9 +143,14 @@ public sealed class FallingDebris : MonoBehaviour
     /// <summary>Puts the piece back so the hazard can be met again.</summary>
     private void Restore()
     {
-        body.isKinematic = true;
+        // Zero the velocities BEFORE going kinematic. A kinematic body is
+        // moved only via transform/MovePosition, not simulated - writing
+        // linear/angularVelocity on one is unsupported and Unity logs a
+        // warning for it every time, even though the values themselves are
+        // harmless zeroes.
         body.linearVelocity = Vector3.zero;
         body.angularVelocity = Vector3.zero;
+        body.isKinematic = true;
 
         transform.SetPositionAndRotation(restPosition, restRotation);
 

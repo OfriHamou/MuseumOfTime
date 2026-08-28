@@ -24,7 +24,7 @@ using UnityEngine.SceneManagement;
 /// Wiring: this is a read-only observer of the existing systems - it
 /// subscribes to GameManager.StateChanged and EraManager.EraChanged, and
 /// polls public state (ChronoHourglass.IsSlowing, ChronoOrbLauncher.ThrownCount,
-/// PlayerController velocity, WardenAI.CurrentState, FracturedObject.IsBroken,
+/// PlayerController velocity, WardenAI.CurrentState, ShadowAI.CurrentState, FracturedObject.IsBroken,
 /// the bell's angular velocity) - the same pattern HUDController uses. No
 /// Phase 3/4 source file changed for any of this.
 /// </summary>
@@ -41,10 +41,14 @@ public sealed class AudioManager : MonoBehaviour
         Bell,
         Fracture,
         WardenAlert,
+        EnemyFrozen,
         Capture,
         EraSwitch,
         SlowTimeEnter,
         SlowTimeExit,
+        SealRestored,
+        SealRejected,
+        PortalActivate,
     }
 
     [Header("Volumes (used when no AudioMixer is assigned)")]
@@ -78,8 +82,11 @@ public sealed class AudioManager : MonoBehaviour
     private Rigidbody bellBody;
 
     private WardenAI[] wardens;
+    private ShadowAI[] shadows;
     private FracturedObject[] fractures;
     private bool[] wardenWasAware;
+    private bool[] wardenWasFrozen;
+    private bool[] shadowWasFrozen;
     private bool[] fractureWasBroken;
 
     private int lastShardCount;
@@ -143,10 +150,14 @@ public sealed class AudioManager : MonoBehaviour
             { Sfx.Bell,          ProceduralAudioClips.Tone("Bell", 700f, 0.7f, amplitude: 0.5f) },
             { Sfx.Fracture,      ProceduralAudioClips.Noise("Fracture", 0.4f, 0.5f, 913, smoothing: 0.2f) },
             { Sfx.WardenAlert,   ProceduralAudioClips.Tone("WardenAlert", 660f, 0.25f, 990f) },
+            { Sfx.EnemyFrozen,   ProceduralAudioClips.Chime("EnemyFrozen") },
             { Sfx.Capture,       ProceduralAudioClips.Tone("Capture", 300f, 0.4f, 150f) },
             { Sfx.EraSwitch,     ProceduralAudioClips.Tone("EraSwitch", 220f, 0.35f) },
             { Sfx.SlowTimeEnter, ProceduralAudioClips.Tone("SlowTimeEnter", 440f, 0.3f, 330f) },
             { Sfx.SlowTimeExit,  ProceduralAudioClips.Tone("SlowTimeExit", 440f, 0.2f, 660f) },
+            { Sfx.SealRestored,  ProceduralAudioClips.Chime("SealRestored") },
+            { Sfx.SealRejected,  ProceduralAudioClips.Tone("SealRejected", 220f, 0.22f, 140f) },
+            { Sfx.PortalActivate, ProceduralAudioClips.Tone("PortalActivate", 220f, 0.9f, 440f, amplitude: 0.5f) },
         };
     }
 
@@ -164,6 +175,10 @@ public sealed class AudioManager : MonoBehaviour
 
         wardens = FindObjectsByType<WardenAI>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         wardenWasAware = new bool[wardens.Length];
+        wardenWasFrozen = new bool[wardens.Length];
+
+        shadows = FindObjectsByType<ShadowAI>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        shadowWasFrozen = new bool[shadows.Length];
 
         fractures = FindObjectsByType<FracturedObject>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         fractureWasBroken = new bool[fractures.Length];
@@ -210,6 +225,7 @@ public sealed class AudioManager : MonoBehaviour
         UpdateOrb();
         UpdateInteraction();
         UpdateWardens();
+        UpdateShadows();
         UpdateFractures();
         UpdateBell();
     }
@@ -378,6 +394,42 @@ public sealed class AudioManager : MonoBehaviour
             }
 
             wardenWasAware[i] = aware;
+
+            bool frozen = wardens[i].CurrentState == WardenAI.State.Frozen;
+
+            if (frozen && !wardenWasFrozen[i])
+            {
+                Play(Sfx.EnemyFrozen);
+            }
+
+            wardenWasFrozen[i] = frozen;
+        }
+    }
+
+    // ---------------- shadow frozen ----------------
+
+    private void UpdateShadows()
+    {
+        if (shadows == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < shadows.Length; i++)
+        {
+            if (shadows[i] == null)
+            {
+                continue;
+            }
+
+            bool frozen = shadows[i].CurrentState == ShadowAI.State.Frozen;
+
+            if (frozen && !shadowWasFrozen[i])
+            {
+                Play(Sfx.EnemyFrozen);
+            }
+
+            shadowWasFrozen[i] = frozen;
         }
     }
 
@@ -473,6 +525,7 @@ public sealed class AudioManager : MonoBehaviour
 
         AudioClip ambience = scene switch
         {
+            "MainMenu" => ProceduralAudioClips.MainMenuTheme("MainMenuTheme"),
             "FrozenCity" => ProceduralAudioClips.FrozenAmbience("FrozenAmbience"),
             "ClockCore" => ProceduralAudioClips.ClockCoreAmbience("ClockCoreAmbience"),
             _ => ProceduralAudioClips.MuseumAmbience("MuseumAmbience"),
