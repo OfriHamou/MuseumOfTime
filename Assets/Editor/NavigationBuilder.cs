@@ -73,6 +73,12 @@ public static class NavigationBuilder
         wardenSurface.BuildNavMesh();
         shadowSurface.BuildNavMesh();
 
+        // Embedded NavMeshData forces the whole scene to binary regardless
+        // of the project's ForceText setting - always externalize right
+        // after baking so a rebuild can never reintroduce that.
+        NavMeshExternalizer.SaveExternal(wardenSurface, "MuseumNight");
+        NavMeshExternalizer.SaveExternal(shadowSurface, "MuseumNight");
+
         SpawnAgents(wardenId, shadowId);
 
         EditorSceneManager.MarkSceneDirty(scene);
