@@ -180,19 +180,31 @@ public sealed class ObjectiveTracker : MonoBehaviour
 
         switch (collector.CurrentStage)
         {
+            // Every line names the ACTION that advances the fight.
+            //
+            // Phase 2 used to read "Survive the summoned Warden", which
+            // describes a hazard rather than a task - a player reads it, deals
+            // with the Warden, and then has nothing to do and walks in circles
+            // waiting for something to happen. What actually moves the fight
+            // on is hitting the Collector in the right era, so say that first
+            // and treat the Warden as the complication it is.
             case Collector.Stage.Shielded:
-                Set("Break the Collector's shield",
-                    "Press Q for the PAST, then throw the Chrono Orb with the left mouse button.");
+                Set("Hit the Collector in the PAST",
+                    "Press Q until the era reads PAST, then throw Chrono Orbs " +
+                    "at it with the left mouse button. Two hits break the shield.");
                 break;
 
             case Collector.Stage.Present:
-                Set("Survive the summoned Warden",
-                    "Press R for the PRESENT. Stay out of its cone of vision, or freeze it with the Orb.");
+                Set("Hit the Collector in the PRESENT",
+                    "Press R until the era reads PRESENT, then hit it with the " +
+                    "Orb again. A Warden is hunting you - freeze it with an Orb " +
+                    "if it gets close.");
                 break;
 
             default:
-                Set("Strike while time is slowed",
-                    "Press R for the FUTURE, hold CTRL to slow time, then hit it with the Orb.");
+                Set("Hit the Collector in the FUTURE, with time slowed",
+                    "Press R until the era reads FUTURE, HOLD CTRL to slow " +
+                    "time, and hit it with the Orb while you are holding it.");
                 break;
         }
     }

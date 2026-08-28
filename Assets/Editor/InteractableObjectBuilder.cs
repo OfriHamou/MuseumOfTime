@@ -57,6 +57,8 @@ public static class InteractableObjectBuilder
             int portals = BuildExitPortals();
             int pickups = BuildPickupModels();
 
+            BuildCollectorLabel();
+
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
 
@@ -166,6 +168,48 @@ public static class InteractableObjectBuilder
         }
     }
 
+    /// <summary>
+    /// Puts the fight's current rule on the boss itself.
+    ///
+    /// The objective banner explains the phase, but it is at the top of the
+    /// screen while the player is looking at the Collector - and when the
+    /// shield breaks the rule changes silently, so orbs that just worked stop
+    /// working with nothing to say why.
+    /// </summary>
+    private static void BuildCollectorLabel()
+    {
+        Collector collector = Object.FindFirstObjectByType<Collector>();
+
+        if (collector == null) { return; }
+
+        Transform existing = collector.transform.Find("PhaseLabel");
+        if (existing != null) { Object.DestroyImmediate(existing.gameObject); }
+
+        var go = new GameObject("PhaseLabel");
+        go.transform.SetParent(collector.transform, false);
+        go.transform.localPosition = new Vector3(0f, 2.6f, 0f);
+
+        var text = go.AddComponent<TextMeshPro>();
+        text.text = "";
+        text.fontSize = 1f;
+        text.alignment = TextAlignmentOptions.Center;
+        text.richText = true;
+        text.textWrappingMode = TextWrappingModes.NoWrap;
+        text.color = new Color(0.96f, 0.97f, 1f);
+
+        var rect = go.GetComponent<RectTransform>();
+        if (rect != null) { rect.sizeDelta = new Vector2(9f, 2.4f); }
+
+        var component = go.AddComponent<CollectorPhaseLabel>();
+
+        var so = new SerializedObject(component);
+        SerializedProperty p = so.FindProperty("collector");
+        if (p != null) { p.objectReferenceValue = collector; }
+        so.ApplyModifiedPropertiesWithoutUndo();
+
+        Debug.Log("COLLECTOR LABEL OK");
+    }
+
     // ==================================================================
     // The things you pick up.
     // ==================================================================
@@ -180,6 +224,13 @@ public static class InteractableObjectBuilder
             if (!(mb is IInteractable)) { continue; }
 
             string typeName = mb.GetType().Name;
+
+            // One collider, correctly sized, whatever earlier builders left.
+            //
+            // Rebuilds had stacked eighteen BoxColliders on the gear, the
+            // largest 2.2 x 5.9 m. Running last means this cleans up after all
+            // of them rather than guessing which builder is responsible.
+            NormaliseCollider(mb.gameObject);
 
             // The holder CollectibleLookBuilder made, which bobs and spins.
             Transform beacon = mb.transform.Find("Beacon");
@@ -225,6 +276,44 @@ public static class InteractableObjectBuilder
         }
 
         return built;
+    }
+
+    /// <summary>
+    /// Leaves exactly one collider on an interactable, sized in metres.
+    /// </summary>
+    private static void NormaliseCollider(GameObject go)
+    {
+        List<Collider> colliders = new List<Collider>(go.GetComponents<Collider>());
+
+        for (int i = colliders.Count - 1; i >= 1; i--)
+        {
+            Object.DestroyImmediate(colliders[i]);
+        }
+
+        var box = go.GetComponent<BoxCollider>();
+
+        if (box == null)
+        {
+            foreach (Collider stale in go.GetComponents<Collider>())
+            {
+                Object.DestroyImmediate(stale);
+            }
+
+            box = go.AddComponent<BoxCollider>();
+        }
+
+        box.isTrigger = false;
+        box.center = Vector3.zero;
+
+        // BoxCollider.size is local, and these objects carry their own scale,
+        // so divide it back out to make the number mean metres.
+        Vector3 lossy = go.transform.lossyScale;
+        const float metres = 1.1f;
+
+        box.size = new Vector3(
+            metres / Mathf.Max(0.0001f, Mathf.Abs(lossy.x)),
+            metres / Mathf.Max(0.0001f, Mathf.Abs(lossy.y)),
+            metres / Mathf.Max(0.0001f, Mathf.Abs(lossy.z)));
     }
 
     /// <summary>A faceted crystal: two cones base to base.</summary>
@@ -325,11 +414,11 @@ public static class InteractableObjectBuilder
         Material metal = Emissive("GearMetal", new Color(0.95f, 0.72f, 0.32f), 0.55f);
 
         GameObject rim = Shape(root, "Rim", PrimitiveType.Cylinder, metal);
-        rim.transform.localScale = new Vector3(0.44f, 0.06f, 0.44f);
+        rim.transform.localScale = new Vector3(0.80f, 0.10f, 0.80f);
         rim.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
 
         GameObject hub = Shape(root, "Hub", PrimitiveType.Cylinder, metal);
-        hub.transform.localScale = new Vector3(0.16f, 0.09f, 0.16f);
+        hub.transform.localScale = new Vector3(0.30f, 0.14f, 0.30f);
         hub.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
 
         for (int i = 0; i < 8; i++)
@@ -340,10 +429,10 @@ public static class InteractableObjectBuilder
             GameObject tooth = Shape(root, "Tooth" + i, PrimitiveType.Cube, metal);
 
             tooth.transform.localPosition = new Vector3(
-                Mathf.Cos(radians) * 0.25f, Mathf.Sin(radians) * 0.25f, 0f);
+                Mathf.Cos(radians) * 0.46f, Mathf.Sin(radians) * 0.46f, 0f);
 
             tooth.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
-            tooth.transform.localScale = new Vector3(0.12f, 0.10f, 0.12f);
+            tooth.transform.localScale = new Vector3(0.22f, 0.18f, 0.22f);
         }
     }
 
