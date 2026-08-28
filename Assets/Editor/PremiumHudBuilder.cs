@@ -165,7 +165,18 @@ public static class PremiumHudBuilder
         StyleMinimapFrame(root);
         StylePauseMenu(root);
 
-        WireHudController(healthFill, energyFill, shardText, eraText,
+        // The numbers, built onto the rows the bars already made.
+        Transform healthRow = root.Find("StatusPanel/HealthRow");
+        Transform energyRow = root.Find("StatusPanel/EnergyRow");
+
+        TMP_Text healthValue = healthRow != null
+            ? BuildBarValue(healthRow.gameObject, "Health") : null;
+
+        TMP_Text energyValue = energyRow != null
+            ? BuildBarValue(energyRow.gameObject, "Energy") : null;
+
+        WireHudController(healthFill, energyFill, healthValue, energyValue,
+                          shardText, eraText,
                           lensIcon, hourglassIcon, detectionRoot, detectionFill,
                           objectiveText, objectiveHint);
     }
@@ -245,6 +256,26 @@ public static class PremiumHudBuilder
     /// stay the names of the FILL images, which is what HUDController drives
     /// and what the existing tests read fillAmount from.
     /// </summary>
+    /// <summary>
+    /// The number beside a bar. A bar at a fifth full is a sliver that reads
+    /// as empty, and a player who believes they are at zero and sees nothing
+    /// happen concludes the game is broken rather than that they are alive.
+    /// </summary>
+    private static TMP_Text BuildBarValue(GameObject row, string label)
+    {
+        TMP_Text value = Text(row, label + "Value", "", 19f, Ink,
+                              TextAlignmentOptions.MidlineRight);
+
+        RectTransform vrt = Rect(value.gameObject);
+        vrt.anchorMin = new Vector2(1f, 0.5f);
+        vrt.anchorMax = new Vector2(1f, 0.5f);
+        vrt.pivot = new Vector2(1f, 0.5f);
+        vrt.anchoredPosition = new Vector2(-6f, 0f);
+        vrt.sizeDelta = new Vector2(120f, 26f);
+
+        return value;
+    }
+
     private static Image BuildBar(GameObject parent, string label, string fillName,
                                   Sprite icon, Color tint, Vector2 offset)
     {
@@ -816,6 +847,7 @@ public static class PremiumHudBuilder
     }
 
     private static void WireHudController(Image healthFill, Image energyFill,
+                                          TMP_Text healthValue, TMP_Text energyValue,
                                           TMP_Text shardText, TMP_Text eraText,
                                           GameObject lensIcon, GameObject hourglassIcon,
                                           GameObject detectionRoot, Image detectionFill,
@@ -832,6 +864,8 @@ public static class PremiumHudBuilder
         var so = new SerializedObject(hud);
         Set(so, "healthFill", healthFill);
         Set(so, "energyFill", energyFill);
+        Set(so, "healthValueText", healthValue);
+        Set(so, "energyValueText", energyValue);
         Set(so, "shardText", shardText);
         Set(so, "eraText", eraText);
         Set(so, "timeLensIcon", lensIcon);
