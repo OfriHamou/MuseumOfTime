@@ -91,7 +91,16 @@ public static class CameraRigParityBuilder
         cam.farClipPlane = 300f;
 
         Ensure<AudioListener>(mainCamera);
-        Ensure<CinemachineBrain>(mainCamera);
+        CinemachineBrain brain = Ensure<CinemachineBrain>(mainCamera);
+
+        // Stock Cinemachine's default blend (2s EaseInOut) is meant for
+        // cinematic cuts, not a perspective toggle - pressing C left the
+        // camera slowly drifting from the third-person position for two
+        // full seconds, during which Camera.main still reported the OLD
+        // camera's transform even though CinemachineBrain already considered
+        // the new one active. Both the interaction system and a player
+        // expect the toggle to be instant.
+        brain.DefaultBlend = new CinemachineBlendDefinition(CinemachineBlendDefinition.Styles.Cut, 0f);
 
         // A brain-driven camera must not also be parented to the player, or
         // the two fight over its transform every frame.
