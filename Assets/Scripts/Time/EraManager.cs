@@ -93,7 +93,7 @@ public sealed class EraManager : MonoBehaviour
         if (!eraTravelUnlocked)
         {
             HudMessageFeed.Post(
-                "Era travel is locked - find the Time Lens first",
+                "Era travel is locked - explore deeper into the museum first",
                 HudMessageFeed.Tone.Bad);
 
             return false;

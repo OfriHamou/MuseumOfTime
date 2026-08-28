@@ -2,10 +2,11 @@ using UnityEngine;
 
 /// <summary>
 /// Step 7.2 particle effects that fire on transient world events rather than
-/// riding a moving object: the shard-collection sparkle and the fracture
-/// dust burst. (The era-switch shockwave is EraSwitchVfx; the orb trail and
-/// the Chronological Shadow drift ride their own objects and are attached by
-/// AudioAndVfxBuilder.)
+/// riding a moving object: the shard-collection sparkle, the fracture
+/// dust burst, and a freeze burst when a Chrono Orb holds a Warden or Shadow
+/// still - shooting an enemy otherwise has no visible impact at all. (The
+/// era-switch shockwave is EraSwitchVfx; the orb trail and the Chronological
+/// Shadow drift ride their own objects and are attached by AudioAndVfxBuilder.)
 ///
 /// Read-only observer of the existing systems, same as AudioManager:
 /// subscribes to GameManager.StateChanged for the shard sparkle, polls the
@@ -19,10 +20,15 @@ public sealed class GameplayVfx : MonoBehaviour
 
     private ParticleSystem shardBurst;
     private ParticleSystem fractureBurst;
+    private ParticleSystem freezeBurst;
 
     private Transform player;
     private FracturedObject[] fractures;
     private bool[] wasBroken;
+    private WardenAI[] wardens;
+    private bool[] wardenWasFrozen;
+    private ShadowAI[] shadows;
+    private bool[] shadowWasFrozen;
     private int lastShardCount;
 
     /// <summary>Exposed so a wiring test can confirm the sparkle actually played.</summary>
@@ -31,10 +37,14 @@ public sealed class GameplayVfx : MonoBehaviour
     /// <summary>Exposed so a wiring test can confirm the dust actually played.</summary>
     public ParticleSystem FractureBurst => fractureBurst;
 
+    /// <summary>Exposed so a wiring test can confirm a frozen hit actually played.</summary>
+    public ParticleSystem FreezeBurst => freezeBurst;
+
     private void Awake()
     {
         shardBurst = CreateBurst("ShardBurst", new Color(1f, 0.9f, 0.4f), 20, 0.12f);
         fractureBurst = CreateBurst("FractureBurst", new Color(0.7f, 0.7f, 0.72f), 35, 0.18f);
+        freezeBurst = CreateBurst("FreezeBurst", new Color(0.6f, 0.9f, 1f), 24, 0.16f);
     }
 
     private void Start()
@@ -47,6 +57,12 @@ public sealed class GameplayVfx : MonoBehaviour
 
         fractures = FindObjectsByType<FracturedObject>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         wasBroken = new bool[fractures.Length];
+
+        wardens = FindObjectsByType<WardenAI>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        wardenWasFrozen = new bool[wardens.Length];
+
+        shadows = FindObjectsByType<ShadowAI>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        shadowWasFrozen = new bool[shadows.Length];
 
         if (GameManager.Instance != null)
         {
@@ -85,6 +101,38 @@ public sealed class GameplayVfx : MonoBehaviour
 
             wasBroken[i] = fractures[i].IsBroken;
         }
+
+        for (int i = 0; i < wardens.Length; i++)
+        {
+            if (wardens[i] == null) { continue; }
+
+            bool frozen = wardens[i].CurrentState == WardenAI.State.Frozen;
+            if (frozen && !wardenWasFrozen[i])
+            {
+                PlayFreezeBurst(wardens[i].transform.position);
+            }
+
+            wardenWasFrozen[i] = frozen;
+        }
+
+        for (int i = 0; i < shadows.Length; i++)
+        {
+            if (shadows[i] == null) { continue; }
+
+            bool frozen = shadows[i].CurrentState == ShadowAI.State.Frozen;
+            if (frozen && !shadowWasFrozen[i])
+            {
+                PlayFreezeBurst(shadows[i].transform.position);
+            }
+
+            shadowWasFrozen[i] = frozen;
+        }
+    }
+
+    private void PlayFreezeBurst(Vector3 position)
+    {
+        freezeBurst.transform.position = position + Vector3.up;
+        freezeBurst.Play();
     }
 
     private void OnStateChanged()

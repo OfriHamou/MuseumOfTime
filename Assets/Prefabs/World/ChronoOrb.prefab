@@ -4990,6 +4990,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: faeb6217c1ee34247bd9a9bcfdc640bb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MuseumOfTime.Runtime::ChronoOrb
-  freezeSeconds: 4
+  freezeSeconds: 30
   breakSpeed: 6
   lifetime: 8

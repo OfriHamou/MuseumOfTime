@@ -13,7 +13,7 @@ using UnityEngine;
 [RequireComponent(typeof(SphereCollider))]
 public sealed class ChronoOrb : MonoBehaviour
 {
-    [SerializeField] private float freezeSeconds = 4f;
+    [SerializeField] private float freezeSeconds = 30f;
 
     [Tooltip("Impact speed below which nothing shatters, in metres/second.")]
     [SerializeField] private float breakSpeed = 6f;

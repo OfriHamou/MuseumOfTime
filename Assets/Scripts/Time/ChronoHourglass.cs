@@ -83,6 +83,12 @@ public sealed class ChronoHourglass : MonoBehaviour
         // Physics steps must shrink with time, or collisions get sloppy and
         // fast objects start tunnelling through walls.
         Time.fixedDeltaTime = 0.02f * slowScale;
+
+        // AudioManager already reacts to IsSlowing (low-pass filter + a
+        // pitch sting), but that alone is easy to miss under museum ambience.
+        // A HUD toast, the same feedback pattern already used for warden
+        // spotting and low-energy throws, makes the moment unambiguous.
+        HudMessageFeed.Post("Slow Time engaged", HudMessageFeed.Tone.Good);
     }
 
     private void Restore()
@@ -97,5 +103,7 @@ public sealed class ChronoHourglass : MonoBehaviour
         // Back to exactly 1, never to whatever it happened to be before.
         Time.timeScale = 1f;
         Time.fixedDeltaTime = 0.02f;
+
+        HudMessageFeed.Post("Slow Time ended", HudMessageFeed.Tone.Good);
     }
 }

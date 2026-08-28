@@ -111,29 +111,128 @@ public static class ProceduralAudioClips
     // Per-scene ambience composers
     // ---------------------------------------------------------------
 
-    /// <summary>MuseumNight: a low hum with a slow, echoing tick.</summary>
+    /// <summary>
+    /// MuseumNight: a quiet, mysterious low hum, with no ticking baked in.
+    ///
+    /// This used to embed a clock tick once a second directly into the loop,
+    /// which meant a loud tick played everywhere in the scene for the entire
+    /// level - not "a museum with a clock in it somewhere" but "a metronome
+    /// with a museum around it". Ticking now belongs to ClockTicker, a
+    /// spatial 3D source placed on actual clock exhibits, so it is only
+    /// audible near them and grows as the player approaches - this clip is
+    /// only the ambient bed.
+    ///
+    /// 9 seconds rather than 4, and a slow amplitude swell, so the loop point
+    /// is far less noticeable than a short clip repeating verbatim.
+    /// </summary>
     public static AudioClip MuseumAmbience(string name)
     {
-        const float duration = 4f;
+        const float duration = 9f;
         int samples = Mathf.CeilToInt(SampleRate * duration);
         var data = new float[samples];
-        int tickEvery = Mathf.CeilToInt(SampleRate * 1f);   // one tick a second
 
         for (int i = 0; i < samples; i++)
         {
             float t = i / (float)SampleRate;
-            float hum = Mathf.Sin(2f * Mathf.PI * 55f * t) * 0.12f +
-                        Mathf.Sin(2f * Mathf.PI * 110f * t) * 0.04f;
 
-            int intoTick = i % tickEvery;
-            float tick = intoTick < SampleRate * 0.04f
-                ? Mathf.Sin(2f * Mathf.PI * 1200f * t) * (1f - intoTick / (SampleRate * 0.04f)) * 0.12f
-                : 0f;
+            // A slow breathing swell (roughly one cycle per loop) keeps a
+            // static drone from feeling mechanical, without adding a
+            // repeating event a player can count along to.
+            float swell = 0.75f + 0.25f * Mathf.Sin(2f * Mathf.PI * (1f / duration) * t);
 
-            data[i] = hum + tick;
+            // Original amplitudes here (0.07/0.025) were roughly -23dB versus
+            // the 0.4-0.5 typical SFX cue - technically playing, but far too
+            // quiet to notice under anything else, which is what "I can't
+            // hear the music" turned out to be. A touch of 220Hz is added
+            // too, since 55/110Hz alone is easy to lose entirely on small
+            // speakers with weak bass response.
+            float hum = (Mathf.Sin(2f * Mathf.PI * 55f * t) * 0.22f +
+                         Mathf.Sin(2f * Mathf.PI * 110f * t) * 0.10f +
+                         Mathf.Sin(2f * Mathf.PI * 220f * t) * 0.05f) * swell;
+
+            data[i] = hum;
         }
 
         return Make(name, data);
+    }
+
+    /// <summary>
+    /// A single clock tick, meant to be looped by a spatial AudioSource
+    /// (ClockTicker) rather than baked into the scene-wide ambience - so it
+    /// is only heard near an actual clock, at a volume that falls off with
+    /// distance like a real sound in the room would.
+    /// </summary>
+    public static AudioClip ClockTick(string name)
+    {
+        const float duration = 1f;
+        int samples = Mathf.CeilToInt(SampleRate * duration);
+        var data = new float[samples];
+
+        for (int i = 0; i < samples; i++)
+        {
+            float t = i / (float)SampleRate;
+            float intoTick = t;
+
+            data[i] = intoTick < 0.04f
+                ? Mathf.Sin(2f * Mathf.PI * 1200f * t) * (1f - intoTick / 0.04f) * 0.5f
+                : 0f;
+        }
+
+        return Make(name, data);
+    }
+
+    /// <summary>
+    /// MainMenu: a calm, cinematic pad with a slow bell motif drifting over
+    /// it - meant to feel distinctly warmer and more hopeful than
+    /// MuseumNight's tense hum, since this is the "welcome to the museum"
+    /// moment rather than the "you are alone in it at night" one.
+    ///
+    /// 16 seconds and the two bell hits land at irregular points in the loop
+    /// (not on a fixed beat), so it does not read as a ticking metronome -
+    /// the exact failure mode this project already fixed once for the
+    /// in-scene clock ambience.
+    /// </summary>
+    public static AudioClip MainMenuTheme(string name)
+    {
+        const float duration = 16f;
+        int samples = Mathf.CeilToInt(SampleRate * duration);
+        var data = new float[samples];
+
+        // A slow, gentle major-leaning triad (A3-C#4-E4), breathing in and
+        // out over the whole loop rather than sitting at a fixed volume.
+        for (int i = 0; i < samples; i++)
+        {
+            float t = i / (float)SampleRate;
+            float swell = 0.7f + 0.3f * Mathf.Sin(2f * Mathf.PI * (1f / duration) * t);
+
+            // Same fix as MuseumAmbience: these were far too quiet (-26dB
+            // range) to actually be heard against anything else in the mix.
+            float pad = (Mathf.Sin(2f * Mathf.PI * 220.00f * t) * 0.18f +
+                         Mathf.Sin(2f * Mathf.PI * 277.18f * t) * 0.13f +
+                         Mathf.Sin(2f * Mathf.PI * 329.63f * t) * 0.11f) * swell;
+
+            data[i] = pad;
+        }
+
+        AddBell(data, 3.2f, 660f);
+        AddBell(data, 9.7f, 880f);
+
+        return Make(name, data);
+    }
+
+    /// <summary>Adds one soft, decaying bell tone into an existing buffer at a given time.</summary>
+    private static void AddBell(float[] data, float atSeconds, float frequency)
+    {
+        int start = Mathf.FloorToInt(atSeconds * SampleRate);
+        const float bellDuration = 2.2f;
+        int bellSamples = Mathf.Min(data.Length - start, Mathf.CeilToInt(SampleRate * bellDuration));
+
+        for (int i = 0; i < bellSamples; i++)
+        {
+            float t = i / (float)SampleRate;
+            float envelope = Mathf.Exp(-t * 1.4f);
+            data[start + i] += Mathf.Sin(2f * Mathf.PI * frequency * t) * envelope * 0.35f;
+        }
     }
 
     /// <summary>FrozenCity: wind, and one impossibly held note over it.</summary>
