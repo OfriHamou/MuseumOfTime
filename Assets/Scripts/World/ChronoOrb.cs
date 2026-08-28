@@ -29,6 +29,23 @@ public sealed class ChronoOrb : MonoBehaviour
     /// <summary>Set when the orb has shattered something.</summary>
     public bool CausedBreak { get; private set; }
 
+    /// <summary>
+    /// Whether the Chrono Hourglass was running at the moment this orb was
+    /// thrown.
+    ///
+    /// The Collector's last phase asks the player to "strike while time is
+    /// slowed", and it used to test that at the moment of IMPACT. Slowing time
+    /// also stretches the orb's flight by more than three times in real
+    /// seconds, so satisfying it meant holding the key through a much longer
+    /// flight - at 18 energy a second, frequently longer than the bar lasts.
+    /// The throw would land a fraction after the Hourglass ran dry and simply
+    /// not count, with the player having done everything right.
+    ///
+    /// Recording it at launch keeps the intent - you have to be slowing time
+    /// to land the blow - without making it a stopwatch problem.
+    /// </summary>
+    public bool ThrownWhileTimeSlowed { get; set; }
+
     private void Awake()
     {
         body = GetComponent<Rigidbody>();

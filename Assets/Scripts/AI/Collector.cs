@@ -122,12 +122,42 @@ public sealed class Collector : MonoBehaviour
         return playerHourglass != null && playerHourglass.IsSlowing;
     }
 
+    private int lastOrbCounted;
+
     private void OnCollisionEnter(Collision collision)
     {
-        if (collision.gameObject.GetComponent<ChronoOrb>() != null)
+        var orb = collision.gameObject.GetComponent<ChronoOrb>();
+
+        if (orb != null)
         {
-            RegisterOrbHit();
+            TakeOrbHit(orb);
         }
+    }
+
+    /// <summary>
+    /// One entry point for an orb striking the Collector, however it arrived.
+    ///
+    /// The physical capsule is only a metre across, which is a hard thing to
+    /// hit with a thrown, arcing projectile from across a chamber. A wider
+    /// trigger volume forwards to this as well, so a throw that passes close
+    /// counts - and this guards against the same orb being counted twice when
+    /// it clips both.
+    /// </summary>
+    public void TakeOrbHit(ChronoOrb orb)
+    {
+        if (orb != null)
+        {
+            int id = orb.GetInstanceID();
+
+            if (id == lastOrbCounted)
+            {
+                return;
+            }
+
+            lastOrbCounted = id;
+        }
+
+        RegisterOrbHit(orb);
     }
 
     /// <summary>
@@ -136,7 +166,7 @@ public sealed class Collector : MonoBehaviour
     /// constructor, so a test cannot fabricate one to drive the message
     /// method itself.
     /// </summary>
-    private void RegisterOrbHit()
+    private void RegisterOrbHit(ChronoOrb orb = null)
     {
         if (stage == Stage.Defeated)
         {
@@ -212,11 +242,21 @@ public sealed class Collector : MonoBehaviour
                     return;
                 }
 
-                if (!TimeIsSlowed())
+                // Slowed now, OR slowed when the throw was made.
+                //
+                // Requiring it at impact alone meant holding the key through a
+                // flight the slowdown had itself stretched by over three
+                // times - often longer than a full energy bar lasts, so a
+                // correct throw would land a moment late and silently not
+                // count.
+                bool slowed = TimeIsSlowed() ||
+                              (orb != null && orb.ThrownWhileTimeSlowed);
+
+                if (!slowed)
                 {
                     HudMessageFeed.Post(
-                        "The orb passes straight through - you must be HOLDING " +
-                        "CTRL to slow time when it lands",
+                        "The orb passes straight through - HOLD CTRL to slow " +
+                        "time, and throw while you are holding it",
                         HudMessageFeed.Tone.Bad);
 
                     return;

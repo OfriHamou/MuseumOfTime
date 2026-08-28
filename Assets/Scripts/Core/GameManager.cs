@@ -84,7 +84,7 @@ public sealed class GameManager : MonoBehaviour
 
     [Header("Chrono Energy regeneration")]
     [Tooltip("Energy recovered per second once the player stops spending it.")]
-    [SerializeField] private float energyRegenPerSecond = 6f;
+    [SerializeField] private float energyRegenPerSecond = 9f;
 
     [Tooltip("Quiet period after the last spend before regeneration resumes.")]
     [SerializeField] private float energyRegenDelay = 1.5f;

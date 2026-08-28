@@ -201,7 +201,12 @@ public sealed class ClockCoreSceneTests
         MethodInfo method = typeof(Collector).GetMethod(
             "RegisterOrbHit", BindingFlags.Instance | BindingFlags.NonPublic);
 
-        method.Invoke(target, null);
+        // One explicit null argument: RegisterOrbHit now takes the orb that
+        // struck (so the last phase can accept a throw MADE while time was
+        // slowed, not only one that lands while it still is). Optional
+        // parameters are a compiler convenience - reflection still requires
+        // the argument to be supplied.
+        method.Invoke(target, new object[] { null });
     }
 
     private bool GetShieldBroken()
