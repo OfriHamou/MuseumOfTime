@@ -97,27 +97,32 @@ public sealed class ObjectiveTracker : MonoBehaviour
 
     // ------------------------------------------------------------------
 
+    // ObjectiveHintText is a single fixed-height line under the main
+    // objective (see HUDCanvas/ObjectiveBanner) - it does not grow to fit a
+    // paragraph. Every hint here is one short line by design; anything a
+    // player needs explained at length belongs in a HudMessageFeed toast or
+    // a tutorial plaque, not here. A hint that used to be a full paragraph
+    // once overflowed the banner and rendered as unbacked text over the
+    // game view - keep these short.
     private void EvaluateMuseum(GameState state)
     {
-        if (!state.hasTimeLens)
+        if (state.hasTimeLens)
         {
-            // Say WHICH WAY. "Up the stairs" is not a direction in a dark
-            // thirty-metre hall with one unlit ramp in a far corner - the
-            // ramp is at the west end, and a player told only that stairs
-            // exist will wander the room looking for them.
-            Set("Find the Time Lens",
-                "Take the ramp at the WEST end of the hall, then follow the " +
-                "mezzanine east to the curator's office.");
+            Set("Reach the portal", "The way forward lies where time first broke.");
             return;
         }
 
-        // "Head for the exit" is not a direction either. The exit is a few
-        // metres NORTH of the office you just came out of, on the same
-        // mezzanine, and a player who does not know that goes looking for a
-        // front door on the ground floor.
-        Set("Leave the museum",
-            "The lit EXIT is a few steps north of the office, on this same " +
-            "balcony. Walk into it.");
+        MuseumTimeSealPuzzle puzzle = MuseumTimeSealPuzzle.Instance;
+
+        if (puzzle != null && puzzle.IsSolved)
+        {
+            Set("Collect the Time Lens", "The display has unlocked upstairs.");
+            return;
+        }
+
+        int restored = puzzle != null ? puzzle.RestoredCount : 0;
+
+        Set("Find the Time Lens", "Restore the Temporal Seals: " + restored + "/3");
     }
 
     private void EvaluateFrozenCity(GameState state)
