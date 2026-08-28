@@ -33,20 +33,67 @@ public sealed class RespawnService : MonoBehaviour
         Instance = this;
     }
 
+    private bool subscribed;
+
     private void OnEnable()
     {
-        if (GameManager.Instance != null)
+        TrySubscribe();
+    }
+
+    private void Start()
+    {
+        // Again here, because OnEnable is too early.
+        //
+        // No scene contains a GameManager - it is created by a
+        // RuntimeInitializeOnLoadMethod(AfterSceneLoad) bootstrap, which runs
+        // AFTER every scene object's Awake and OnEnable. So at OnEnable
+        // GameManager.Instance is null, the subscription silently did not
+        // happen, and nothing in the game was listening for PlayerDied.
+        //
+        // Health reached zero and absolutely nothing occurred - and because
+        // TakeDamage returns early once health is zero, the player was then
+        // stuck alive at zero permanently, unable to die or be sent back.
+        TrySubscribe();
+    }
+
+    private void Update()
+    {
+        // Two backstops, because dying is not something that may quietly fail.
+        TrySubscribe();
+
+        if (!subscribed || GameManager.Instance == null || dying)
         {
-            GameManager.Instance.PlayerDied += OnPlayerDied;
+            return;
         }
+
+        // If health is at zero and no death is in progress, run one. This
+        // catches any path that empties health without raising the event -
+        // a loaded save, a direct write, an event lost to ordering.
+        if (GameManager.Instance.State.currentHealth <= 0)
+        {
+            OnPlayerDied();
+        }
+    }
+
+    private void TrySubscribe()
+    {
+        if (subscribed || GameManager.Instance == null)
+        {
+            return;
+        }
+
+        GameManager.Instance.PlayerDied += OnPlayerDied;
+        subscribed = true;
     }
 
     private void OnDisable()
     {
-        if (GameManager.Instance != null)
+        if (subscribed && GameManager.Instance != null)
         {
             GameManager.Instance.PlayerDied -= OnPlayerDied;
         }
+
+        subscribed = false;
     }
 
     /// <summary>
@@ -57,13 +104,23 @@ public sealed class RespawnService : MonoBehaviour
     /// The world simply jumped. Reaching zero health is the most important
     /// thing the game has to tell you, and it was the one thing it did not.
     /// </summary>
+    private bool dying;
+
     private void OnPlayerDied()
     {
+        if (dying)
+        {
+            return;
+        }
+
+        dying = true;
+
         if (DeathOverlay.Instance == null)
         {
             // No overlay in this scene - still better to respawn than to
             // leave the player stuck at zero health.
             Respawn();
+            dying = false;
             return;
         }
 
@@ -101,10 +158,12 @@ public sealed class RespawnService : MonoBehaviour
         if (gameOver)
         {
             GameOver();
+            dying = false;
             yield break;
         }
 
         Respawn();
+        dying = false;
     }
 
     /// <summary>

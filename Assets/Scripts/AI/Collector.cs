@@ -145,11 +145,21 @@ public sealed class Collector : MonoBehaviour
 
         TimeEra era = EraManager.Instance != null ? EraManager.Instance.CurrentEra : TimeEra.Present;
 
+        // EVERY hit says something now.
+        //
+        // Each of these used to be a bare return: the player threw an orb, it
+        // struck the Collector, and nothing happened at all - no sound, no
+        // message, no flicker. There was no way to learn the rule from playing,
+        // because the game's answer to a wrong-era hit and its answer to a
+        // miss were identical, and the answer to a correct-but-not-final hit
+        // was identical too. "Throwing does nothing to the boss" is the only
+        // conclusion available.
         switch (stage)
         {
             case Stage.Shielded:
                 if (era != TimeEra.Past)
                 {
+                    RejectHit(TimeEra.Past, era);
                     return;
                 }
 
@@ -160,6 +170,20 @@ public sealed class Collector : MonoBehaviour
                     if (shieldVisual != null) shieldVisual.SetActive(false);
                     if (summonedWarden != null) summonedWarden.SetActive(true);
                     stage = Stage.Present;
+
+                    HudMessageFeed.Post(
+                        "Shield broken! It has summoned a Warden - now hit it " +
+                        "in the PRESENT (press R)",
+                        HudMessageFeed.Tone.Good);
+                }
+                else
+                {
+                    int left = Mathf.Max(1, hitsToBreakShield - hitsTaken);
+
+                    HudMessageFeed.Post(
+                        "The shield cracks - " + left + " more hit" +
+                        (left == 1 ? "" : "s") + " in the PAST",
+                        HudMessageFeed.Tone.Good);
                 }
 
                 break;
@@ -167,6 +191,7 @@ public sealed class Collector : MonoBehaviour
             case Stage.Present:
                 if (era != TimeEra.Present)
                 {
+                    RejectHit(TimeEra.Present, era);
                     return;
                 }
 
@@ -174,14 +199,26 @@ public sealed class Collector : MonoBehaviour
                 erosionBeginsAt = Time.time + erosionGraceSeconds;
 
                 HudMessageFeed.Post(
-                    "The moment is erasing you - hold CTRL to slow time",
-                    HudMessageFeed.Tone.Bad);
+                    "It retreats into the FUTURE. Press R, then HOLD CTRL to " +
+                    "slow time and hit it while you hold it",
+                    HudMessageFeed.Tone.Good);
 
                 break;
 
             case Stage.Future:
-                if (era != TimeEra.Future || !TimeIsSlowed())
+                if (era != TimeEra.Future)
                 {
+                    RejectHit(TimeEra.Future, era);
+                    return;
+                }
+
+                if (!TimeIsSlowed())
+                {
+                    HudMessageFeed.Post(
+                        "The orb passes straight through - you must be HOLDING " +
+                        "CTRL to slow time when it lands",
+                        HudMessageFeed.Tone.Bad);
+
                     return;
                 }
 
@@ -189,6 +226,21 @@ public sealed class Collector : MonoBehaviour
                 Defeat();
                 break;
         }
+    }
+
+    /// <summary>
+    /// Says why an orb did nothing, naming the era needed and the key for it.
+    /// </summary>
+    private static void RejectHit(TimeEra needed, TimeEra current)
+    {
+        string key = needed == TimeEra.Past ? "Q"
+            : needed == TimeEra.Future ? "R" : "Q or R";
+
+        HudMessageFeed.Post(
+            "The Collector is untouchable in the " + current.ToString().ToUpperInvariant() +
+            " - it can only be hurt in the " + needed.ToString().ToUpperInvariant() +
+            ". Press " + key + ".",
+            HudMessageFeed.Tone.Bad);
     }
 
     private void Defeat()

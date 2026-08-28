@@ -69,6 +69,13 @@ public sealed class CollectorPhaseLabel : MonoBehaviour
             return "<color=#8BE29A>THE COLLECTOR IS UNDONE</color>";
         }
 
+        // The name and what it is, every frame. It was an unlabelled shape in
+        // a room, and "I don't get what the boss is" is the fair reading of an
+        // enemy the game never introduces.
+        const string title =
+            "<color=#C9B3FF>THE COLLECTOR</color>\n" +
+            "<size=60%>It is unmaking the timeline. Undo it with the Chrono Orb.</size>\n";
+
         TimeEra needed;
         string extra;
 

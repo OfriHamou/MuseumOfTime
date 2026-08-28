@@ -17,6 +17,12 @@ public sealed class HUDController : MonoBehaviour
 {
     [SerializeField] private Image healthFill;
     [SerializeField] private Image energyFill;
+
+    [Tooltip("Numbers beside the bars. A bar at 20% is a sliver that reads " +
+             "as empty, and a player who thinks they are at zero and sees " +
+             "nothing happen concludes the game is broken.")]
+    [SerializeField] private TMP_Text healthValueText;
+    [SerializeField] private TMP_Text energyValueText;
     [SerializeField] private TMP_Text shardText;
     [SerializeField] private TMP_Text eraText;
     [SerializeField] private GameObject timeLensIcon;
@@ -111,6 +117,17 @@ public sealed class HUDController : MonoBehaviour
 
         if (healthFill != null) healthFill.fillAmount = (float)state.currentHealth / state.maxHealth;
         if (energyFill != null) energyFill.fillAmount = state.currentEnergy / state.maxEnergy;
+
+        if (healthValueText != null)
+        {
+            healthValueText.text = state.currentHealth + " / " + state.maxHealth;
+        }
+
+        if (energyValueText != null)
+        {
+            energyValueText.text = Mathf.RoundToInt(state.currentEnergy) + " / " +
+                                   Mathf.RoundToInt(state.maxEnergy);
+        }
         if (shardText != null) shardText.text = state.timeShards.ToString();
         if (eraText != null) eraText.text = state.currentEra.ToString();
         if (timeLensIcon != null) timeLensIcon.SetActive(state.hasTimeLens);
