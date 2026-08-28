@@ -23,6 +23,10 @@ using UnityEngine;
 public sealed class WorldTutorialText : MonoBehaviour
 {
     [SerializeField] private float fadeDistance = 6f;
+
+    [Tooltip("Closer than this and the text fades out - a several-metre-wide " +
+             "world quad seen from arm's length fills the entire screen.")]
+    [SerializeField] private float nearFadeDistance = 2.6f;
     [SerializeField] private float fadeSpeed = 4f;
 
     private TextMeshPro label;
@@ -59,17 +63,45 @@ public sealed class WorldTutorialText : MonoBehaviour
             transform.rotation = Quaternion.LookRotation(transform.position - cam.transform.position);
         }
 
-        bool inRange = player != null &&
-            Vector3.Distance(transform.position, player.position) <= fadeDistance;
+        // Near AND far limits, because only having a far one is what put
+        // metre-high letters across the whole screen.
+        //
+        // These are world-space quads several metres wide. Standing next to
+        // one, perspective does exactly what perspective does: a single word
+        // fills the viewport and the player cannot see the room they are in.
+        // Walking up to a sign to read it made it unreadable.
+        //
+        // Nothing useful happens inside the near limit - the text was already
+        // legible several metres back - so it fades out as you close in.
+        float toPlayer = player != null
+            ? Vector3.Distance(transform.position, player.position)
+            : float.MaxValue;
 
-        if (inRange && !wasVisible)
+        // Two SEPARATE questions, and conflating them was a bug.
+        //
+        //   nearEnough - is the player close enough for this plaque to be
+        //                worth showing? This is what refreshes the template,
+        //                so live values like {energy} are substituted.
+        //
+        //   tooClose   - is the player so close that the quad fills the
+        //                screen? This only controls opacity.
+        //
+        // Folding the near limit into the first question meant a plaque the
+        // player walked right up to never refreshed its text at all, so it
+        // still read "{energy}" instead of a number.
+        bool nearEnough = player != null && toPlayer <= fadeDistance;
+        bool tooClose = toPlayer < nearFadeDistance;
+
+        if (nearEnough && !wasVisible)
         {
             ApplyTemplate();
         }
 
-        wasVisible = inRange;
+        wasVisible = nearEnough;
 
-        alpha = Mathf.MoveTowards(alpha, inRange ? 1f : 0f, fadeSpeed * Time.unscaledDeltaTime);
+        float target = nearEnough && !tooClose ? 1f : 0f;
+
+        alpha = Mathf.MoveTowards(alpha, target, fadeSpeed * Time.unscaledDeltaTime);
         ApplyColor();
     }
 

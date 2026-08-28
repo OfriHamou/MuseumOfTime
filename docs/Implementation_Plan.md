@@ -1277,43 +1277,36 @@ If the schedule compresses, this is the order to protect. Higher items lose more
 
 Fill this in as you go. It is both your own tracker and the raw material for GDD slides 2+ (S8).
 
-| Req | Requirement | Scene(s) | Implementation / script | Evidence file | Status |
+| Req | Requirement | Scene(s) | Implementation / script | Evidence | Status |
 |---|---|---|---|---|---|
-| T1 | Entry + victory menus | MainMenu, Victory | | | ☐ |
-| T2 | Dynamic 3D tutorial text | All | `TutorialText.cs`, world-space TMP | | ☐ |
-| T3 | ≥4 triggers | All | `RoomEntry`, `Tutorial`, `EraZone`, `Hazard`, `TimeAnchor` | | ☐ |
-| T4 | ≥3 collisions | All | `ChronoOrb`, debris, Warden contact, boss shield | | ☐ |
-| T5 | Hinge joints | Museum, FrozenCity | Pendulum, bell, gate | | ☐ |
-| T6 | Self-built Terrain | FrozenCity | Unity Terrain, 3 layers | | ☐ |
-| T7 | Patrol with pause | FrozenCity, ClockCore | `PatrolRoute.cs`, `WardenAI.cs` | | ☐ |
-| T8 | Score / health / energy | All | `GameManager`, `GameState` | | ☐ |
-| T9 | Cross-scene + 2 items | All | `GameState` JSON, Lens + Hourglass | | ☐ |
-| T10 | Voronoi fracture ×2 | Museum, FrozenCity | Blender Cell Fracture; `FracturedObject.cs` | | ☐ |
-| T11 | LOD ×2 | Museum + reused | Blender Decimate; `LODGroup` | | ☐ |
-| T12 | New Input System only | All | `MuseumInputActions`, `PlayerInputReader` | | ☐ |
-| T13 | 2 agent types, separate bake | FrozenCity, ClockCore | 2× `NavMeshSurface`; `Seek`/`Flee`/`Pursue` | | ☐ |
-| T14 | Animator ≥4 states, authored | All | `NoaController`, `WardenController` | | ☐ |
-| T15 | Physical projectile | All | `ChronoOrbLauncher.cs` | | ☐ |
-| T16 | Recast + stealth | FrozenCity, ClockCore | NavMeshSurface + detection meter | | ☐ |
-| T17 | LayerMask in code | All | `LayerMask.GetMask(...)` in `WardenAI` | | ☐ |
-| T18 | Minimap, whole scene | MuseumNight | Ortho camera → RenderTexture | | ☐ |
-| T19 | FPS ⇄ 3rd person | All | `CM_FirstPerson`, `CM_ThirdPerson` | | ☐ |
-| T20 | Two storeys + stairs | MuseumNight | ProBuilder museum | | ☐ |
-| T21 | ≥2 hidden teleports, scene 2+ | FrozenCity, ClockCore | `TimeAnchor.cs` | | ☐ |
-| S1 | ≤300 MB compressed | — | | | ☐ |
-| S2 | Build + GDD uploaded, packaging verified | — | | | ☐ |
-| S3 | GDD as PowerPoint + YouTube link | — | | | ☐ |
-| S4 | Trailer ≤1:15 | — | | | ☐ |
-| S5 | EXE uploaded with GDD | — | | | ☐ |
-| S6 | Repository + link in GDD | — | | | ☐ |
-| S7 | GDD p.1 names + known bugs | — | | | ☐ |
-| S8 | GDD p.2+ per-scene requirement map | — | | | ☐ |
-| S9 | Coherent link across scenes | All | Lens → scene 2 → Hourglass → scene 3 | | ☐ |
-| S10 | Scale / realism | All | Scale audit | | ☐ |
-| G1 | Interest and ambition | All | Era system, consequence puzzles | | ☐ |
-| G2 | Trailer quality | — | | | ☐ |
-| D2 | Build runs on defense machine | — | | | ☐ |
-| D5 | Live add/remove rehearsed | — | | | ☐ |
+| **T1** | Entry + victory menus | MainMenu, Victory | `MainMenuController`, `VictoryScreenController`, `PremiumMenuBuilder` | `RequirementComplianceTests.T1_*` | ☑ |
+| **T2** | Dynamic 3D tutorial text | All three | `WorldTutorialText` / `WorldObjectiveText` (world-space `TextMeshPro`), `TutorialTextBuilder`, `SceneGuidanceBuilder` | `T2_EveryGameplaySceneHasWorldSpaceTutorialText` | ☑ |
+| **T3** | ≥4 triggers | All three | `RoomEntry`, `Tutorial`, `EraZone`, `Hazard`, `TimeAnchor`, `SceneExit` — 6 types | `T3_AtLeastFourDistinctTriggerTypesExist` | ☑ |
+| **T4** | ≥3 collisions | All three | `ChronoOrb`, `Collector`, `FallingDebris`, `SwingingHazard` — 4 `OnCollisionEnter`, all reading `relativeVelocity` | `T4_AtLeastThreeCollisionHandlers*`, `T4_FallingDebris*` | ☑ |
+| **T5** | Hinge joints | All three | Pendulum, gallery gate, signboard, tower bell, 2× ClockCore swinging exhibits | `T5_HingeJointsExistInEveryGameplayScene` | ☑ |
+| **T6** | Self-built Terrain | FrozenCity | `TerrainBuilder` — sculpted, 3 paint layers | `T6_FrozenCityHasARealTerrain` (asserts non-flat) | ☑ |
+| **T7** | Patrol with pause | All three | `PatrolRoute` per-waypoint `waitSeconds`; `WardenAI` sets `agent.isStopped` | `T7_PatrolRouteHasWaypointsAndARealPause` | ☑ |
+| **T8** | Score / health / energy | All three | `GameManager` + `GameState`; `HUDController` in every gameplay scene | `T8_ScoreHealthAndEnergyAllChangeAndAreShown` | ☑ |
+| **T9** | Cross-scene + 2 items | All | `GameState` JSON; Lens gates scene 2, Hourglass gates scene 3 | `T9_StateSerialises*`, `FullPlaythroughTests` | ☑ |
+| **T10** | Voronoi fracture ×2 | Museum, FrozenCity | `ClockOfCreation` (29 shards), `FrozenStatue` (48 shards); `FracturedObject` | `T10_TwoDistinctFracturedAssetsAppearAtHumanScale` | ☑ |
+| **T11** | LOD ×2 | Museum + reused | `StoneColumn` 4992/2496/998 tris, `MarbleStatue` 9760/4880/1952; real `LODGroup` | `T11_TwoLodAssetsWithThreeDecreasingTiers` | ☑ |
+| **T12** | New Input System only | All | `MuseumInputActions` + `PlayerInputReader`, the single point of contact | `T12_InputComesOnlyFromTheNewInputSystem` | ☑ |
+| **T13** | 2 agent types, separate bake | All three | `WardenAI` / `ShadowAI` on 2 `NavMeshSurface` bakes with different `agentTypeID`; `Seek`/`Flee`/`Pursue` | `T13_TwoAgentTypesOnSeparateBakes*`, `T13_SteeringBehavioursAreNamedExplicitly` | ☑ |
+| **T14** | Animator ≥4 states, authored | All | `NoaController` (6 states), `WardenController` (5 states), both with motions wired | `T14_BothAnimatorsHaveFourPlayableStates` | ☑ |
+| **T15** | Physical projectile | All three | `ChronoOrbLauncher` + `ChronoOrb` (Rigidbody, `OnCollisionEnter`) | `T15_ChronoOrbIsAPhysicalBodyThatImpacts` | ☑ |
+| **T16** | Recast + stealth | All three | 2× baked `NavMeshSurface` + `WardenAI` detection meter and cover | `T13_*` (bakes) + `T17_*` (vision mask) | ☑ |
+| **T17** | LayerMask in code | All | `LayerMask.GetMask(...)` in `WardenAI.Awake` and `PlayerInteractor.Awake` | `T17_LayerMasksAreBuiltInCodeNotTheInspector` | ☑ |
+| **T18** | Minimap, whole scene | MuseumNight | Ortho camera → `MinimapRT`, `Minimap` layer allow-list | `T18_MinimapIsLiveForTheWholeOfMuseumNight` | ☑ |
+| **T19** | FPS ⇄ 3rd person | All three | 2× `CinemachineCamera` + `PlayerCameraRig` per scene; `CameraRigParityBuilder` | `T19_EveryGameplaySceneCanSwitchBetweenTwoCameras` | ☑ |
+| **T20** | Two storeys + stairs | MuseumNight | Ground + upper slab, 32-step staircase, 4 authored textures with normal maps | `T20_MuseumHasTwoStoreysStairsAndAuthoredTextures` (asserts stepOffset clears the rise) | ☑ |
+| **T21** | ≥2 hidden teleports, scene 2+ | FrozenCity, ClockCore | `TimeAnchor` ×2 per scene, invisible without the Lens; **none in MuseumNight** | `T21_HiddenTeleportsExistFromSceneTwoOnwardAndNotBefore` | ☑ |
+| **S9** | Coherent link across scenes | All | Lens → scene 2 → Hourglass → scene 3 → Victory, each exit gated both ways | `FullPlaythroughTests.Playthrough_MainMenuToVictoryThroughEveryScene` | ☑ |
+| **S10** | Scale / realism | All | 1 unit = 1 m; model import scale fixed (see `docs/Defect_And_Look_Pass.md` §2) | `T10_*`, `T11_*` size assertions | ☑ |
+
+Rows T1–T21, S9 and S10 are asserted by `Assets/Tests/PlayMode/RequirementComplianceTests.cs` and
+`FullPlaythroughTests.cs` — **113 PlayMode tests, all passing**. The remaining submission rows
+(S1–S8 packaging, G2 trailer, D2 defense machine) are administrative and are tracked in
+`docs/Defect_And_Look_Pass.md` under "Known remaining work".
 
 ---
 

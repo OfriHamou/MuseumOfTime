@@ -278,9 +278,12 @@ public static class AudioAndVfxBuilder
 
     private static void BuildMuseumLighting()
     {
-        // Deep shadows: a dim, cool ambient floor so the pooled lights read.
-        RenderSettings.ambientMode = AmbientMode.Flat;
-        RenderSettings.ambientLight = new Color(0.06f, 0.07f, 0.10f);
+        // Ambient, fog and post-processing are deliberately NOT set here any
+        // more. This method used to force a flat 0.06 ambient, which ran after
+        // CinematicLookBuilder in FullSceneRebuild and silently reverted the
+        // whole look pass - interiors went back to rendering nearly black.
+        // CinematicLookBuilder owns the environment; this method owns the
+        // light rig only.
 
         GameObject root = FindOrCreate("MuseumLighting", null);
         ClearChildren(root);
@@ -294,7 +297,7 @@ public static class AudioAndVfxBuilder
         Light moonlight = moon.AddComponent<Light>();
         moonlight.type = LightType.Directional;
         moonlight.color = new Color(0.6f, 0.72f, 1f);
-        moonlight.intensity = 0.5f;
+        moonlight.intensity = 1.6f;
         moonlight.shadows = LightShadows.Soft;
 
         // Warm pooled exhibit spots, shadows off (cheap), pointing straight
@@ -316,12 +319,32 @@ public static class AudioAndVfxBuilder
 
             Light spot = spotGo.AddComponent<Light>();
             spot.type = LightType.Spot;
-            spot.color = new Color(1f, 0.82f, 0.55f);
-            spot.intensity = 3.5f;
-            spot.range = 10f;
-            spot.spotAngle = 55f;
-            spot.shadows = LightShadows.None;
+            spot.color = new Color(1f, 0.84f, 0.6f);
+            spot.intensity = 20f;
+            spot.range = 22f;
+            spot.spotAngle = 70f;
+            spot.innerSpotAngle = 24f;
+
+            // Shadows on. The pools are the whole point of a night museum -
+            // without a shadow each spot just washes the room flat and the
+            // exhibit it is meant to pick out stops reading as lit at all.
+            spot.shadows = LightShadows.Soft;
+            spot.shadowStrength = 0.85f;
         }
+
+        // A very dim warm bounce at floor level, standing in for the light the
+        // marble would throw back. Four hard pools with pure black between
+        // them read as broken lighting rather than as atmosphere.
+        var fillGo = new GameObject("InteriorFill");
+        fillGo.transform.SetParent(root.transform, false);
+        fillGo.transform.position = new Vector3(0f, 2.2f, 0f);
+
+        Light fill = fillGo.AddComponent<Light>();
+        fill.type = LightType.Point;
+        fill.color = new Color(1f, 0.86f, 0.68f);
+        fill.intensity = 6f;
+        fill.range = 38f;
+        fill.shadows = LightShadows.None;
     }
 
     /// <summary>
@@ -331,8 +354,7 @@ public static class AudioAndVfxBuilder
     /// </summary>
     private static void BuildFrozenCityLighting()
     {
-        RenderSettings.ambientMode = AmbientMode.Flat;
-        RenderSettings.ambientLight = new Color(0.10f, 0.13f, 0.18f);
+        // Ambient is owned by CinematicLookBuilder - see BuildMuseumLighting.
 
         GameObject root = FindOrCreate("FrozenCityLighting", null);
         ClearChildren(root);
@@ -342,9 +364,20 @@ public static class AudioAndVfxBuilder
         sun.transform.rotation = Quaternion.Euler(15f, -40f, 0f);
         Light dusk = sun.AddComponent<Light>();
         dusk.type = LightType.Directional;
-        dusk.color = new Color(0.55f, 0.68f, 0.95f);
-        dusk.intensity = 0.6f;
+        dusk.color = new Color(0.58f, 0.70f, 0.98f);
+        dusk.intensity = 1.05f;
         dusk.shadows = LightShadows.Soft;
+
+        // A weak warm bounce from the lit windows lining the street, so the
+        // snow between the lamp pools is not a flat blue void.
+        var bounceGo = new GameObject("StreetBounce");
+        bounceGo.transform.SetParent(root.transform, false);
+        bounceGo.transform.rotation = Quaternion.Euler(-18f, 140f, 0f);
+        Light bounce = bounceGo.AddComponent<Light>();
+        bounce.type = LightType.Directional;
+        bounce.color = new Color(1f, 0.82f, 0.58f);
+        bounce.intensity = 0.28f;
+        bounce.shadows = LightShadows.None;
     }
 
     /// <summary>
@@ -354,11 +387,23 @@ public static class AudioAndVfxBuilder
     /// </summary>
     private static void BuildClockCoreLighting()
     {
-        RenderSettings.ambientMode = AmbientMode.Flat;
-        RenderSettings.ambientLight = new Color(0.09f, 0.06f, 0.14f);
+        // Ambient is owned by CinematicLookBuilder - see BuildMuseumLighting.
 
         GameObject root = FindOrCreate("ClockCoreLighting", null);
         ClearChildren(root);
+
+        // A real key light. The arena previously had this rim at 0.4 and the
+        // Collector's spotlight and nothing else, so everything outside a
+        // 14 m cone rendered as flat black - the floor, the walls, the
+        // era-puzzle geometry and both AI agents included.
+        var key = new GameObject("TimeKeyLight");
+        key.transform.SetParent(root.transform, false);
+        key.transform.rotation = Quaternion.Euler(52f, -30f, 0f);
+        Light keyLight = key.AddComponent<Light>();
+        keyLight.type = LightType.Directional;
+        keyLight.color = new Color(0.68f, 0.62f, 0.95f);
+        keyLight.intensity = 1.5f;
+        keyLight.shadows = LightShadows.Soft;
 
         var rim = new GameObject("TimeRimLight");
         rim.transform.SetParent(root.transform, false);
@@ -366,8 +411,32 @@ public static class AudioAndVfxBuilder
         Light rimLight = rim.AddComponent<Light>();
         rimLight.type = LightType.Directional;
         rimLight.color = new Color(0.55f, 0.4f, 0.9f);
-        rimLight.intensity = 0.4f;
+        rimLight.intensity = 0.85f;
         rimLight.shadows = LightShadows.None;
+
+        // Amber practicals around the arena rim: the machine still running.
+        Vector3[] practicals =
+        {
+            new Vector3(-11f, 4.5f, -8f),
+            new Vector3(11f, 4.5f, -8f),
+            new Vector3(-11f, 4.5f, 6f),
+            new Vector3(11f, 4.5f, 6f),
+            new Vector3(0f, 5.5f, -14f),
+        };
+
+        for (int i = 0; i < practicals.Length; i++)
+        {
+            var go = new GameObject("GearGlow_" + i);
+            go.transform.SetParent(root.transform, false);
+            go.transform.position = practicals[i];
+
+            Light glow = go.AddComponent<Light>();
+            glow.type = LightType.Point;
+            glow.color = new Color(1f, 0.7f, 0.34f);
+            glow.intensity = 10f;
+            glow.range = 17f;
+            glow.shadows = LightShadows.None;
+        }
 
         var spotGo = new GameObject("CollectorSpotlight");
         spotGo.transform.SetParent(root.transform, false);

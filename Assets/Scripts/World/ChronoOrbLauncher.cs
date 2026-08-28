@@ -10,7 +10,7 @@ public sealed class ChronoOrbLauncher : MonoBehaviour
     [SerializeField] private GameObject orbPrefab;
     [SerializeField] private float launchForce = 14f;
     [SerializeField] private float cooldown = 0.4f;
-    [SerializeField] private float energyCost = 5f;
+    [SerializeField] private float energyCost = 4f;
 
     [Tooltip("How far in front of the camera the orb appears, so it does " +
              "not spawn inside Noa's own collider.")]
@@ -57,6 +57,12 @@ public sealed class ChronoOrbLauncher : MonoBehaviour
         if (GameManager.Instance != null &&
             !GameManager.Instance.SpendEnergy(energyCost))
         {
+            // Silence here reads as a broken mouse button. Say why - the bar
+            // refills on its own, so this is a wait, not a dead end.
+            HudMessageFeed.Post(
+                "Not enough Chrono Energy to throw an orb",
+                HudMessageFeed.Tone.Bad);
+
             return false;
         }
 
@@ -65,7 +71,14 @@ public sealed class ChronoOrbLauncher : MonoBehaviour
 
         GameObject orb = Instantiate(orbPrefab, spawn, cam.rotation);
         LastOrb = orb.GetComponent<ChronoOrb>();
-        LastOrb?.Launch(cam.forward, launchForce);
+
+        var hourglass = GetComponent<ChronoHourglass>();
+
+        if (LastOrb != null)
+        {
+            LastOrb.ThrownWhileTimeSlowed = hourglass != null && hourglass.IsSlowing;
+            LastOrb.Launch(cam.forward, launchForce);
+        }
 
         nextAllowedTime = Time.unscaledTime + cooldown;
         ThrownCount++;

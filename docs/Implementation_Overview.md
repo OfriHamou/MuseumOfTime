@@ -128,6 +128,27 @@ the real-hardware framerate check — none of which can be done or verified head
 |  | **8.4 Compliance audit and evidence** — fill the compliance matrix; capture a clip per requirement; note the file and line where each is implemented. | Proves every one of the 21 technical requirements is present, and supplies the content for the GDD's per-scene pages |
 |  | **8.5 Defense preparation** — run the shipped build on your own machine beforehand; rehearse explaining the AI, era and teleport scripts cold; rehearse adding and removing an element on a timer. | **The game running on your own machine, worth 5 points** [D2]; **a defense on the source code** [D3]; **adding and removing basic elements live** [D5] |
 
+## Phase 9 — Defect and look pass  ✅ COMPLETE
+
+A pass driven by actually running the game in Unity and looking at it, rather than by re-reading the
+plan. Full detail, including the root cause of each defect, in `docs/Defect_And_Look_Pass.md`.
+
+| ✅ | Step | What requirement this satisfies |
+|---|---|---|
+| ✅ | **9.1 The missing `GameManager`** — it existed only in MainMenu and Victory, so all three gameplay scenes ran without one. Every component binding to `StateChanged` in `Start()` bound to nothing: the HUD, the shard SFX and VFX, the item icons. Fixed with an `AfterSceneLoad` bootstrap plus a duplicate guard that no longer destroys `SceneLoader` alongside it. | Ten of the eleven test failures were this one bug. Restores [T8] and the HUD half of [T2] |
+| ✅ | **9.2 T10/T11 were invisible** — the fracture and LOD prefabs are rebuilt from raw `sharedMesh`, discarding each FBX node's rotation (89.98°) and scale (100). The 4 m column shipped as a 4 cm pebble lying on its side; `LODGroup.size` was 0.04. | **Both self-fractured assets and both self-decimated LOD assets now actually appear** [T10, T11]; also [S10] |
+| ✅ | **9.3 T19 existed in one scene of three** — FrozenCity and ClockCore had a single camera each and no `PlayerCameraRig`, so `C` did nothing. | **First/third-person toggle in every gameplay scene** [T19] |
+| ✅ | **9.4 T4 was below its own minimum** — only two `OnCollisionEnter` implementations existed against a required three. Added `FallingDebris` and `SwingingHazard`, both scaling their response from `relativeVelocity`. | **Four collisions detected and acted upon** [T4], and gives the hinges gameplay weight [T5] |
+| ✅ | **9.5 Scenes 2 and 3 had no HUD, pause menu, EventSystem or 3D tutorial text** — a player reaching FrozenCity was never told that Q/R switch era. | **3D tutorial text in all three scenes** [T2]; health/energy/score visible throughout [T8]; per-scene trigger and hinge coverage [T3, T5] |
+| ✅ | **9.6 Look development** — no camera had `UniversalAdditionalCameraData`, so URP ran **zero** post-processing anywhere; volume profiles saved empty; `EraGrading` overrode the whole grade; particles drew as opaque white boxes; Noa rendered buried to the waist and doubled; enemies were untextured capsules; materials had no normal maps and one fixed tiling for every object size. | How interesting the game looks [G1] and how the trailer lands [G2] |
+| ✅ | **9.7 Verification** — `RequirementComplianceTests` (one test per T1–T21, asserting real properties rather than presence) and `FullPlaythroughTests` (MainMenu → Victory in one run, driving real triggers and the boss). | Makes Part 8's compliance matrix executable; **automates S9's full chain end to end** |
+
+| ✅ | **9.8 Museum dressing** — the museum was an open-topped box with bare interiors. Added a coffered ceiling with skylight openings (so the moonlight still falls in shafts), skirting and cornice, glass display cases on marble plinths, framed wall art with picture lights, and benches. Navmesh re-baked so agents path around the new colliders. | How interesting the game looks [G1, G2]; scale and realism [S10] |
+| ✅ | **9.9 Minimap actually showed something** — the Minimap layer held only the player's own marker, so the map was one arrow on a blank background. Map plates are now generated **from the museum's real geometry**, with gold objectives and a green exit. | **A minimap that gives orientation, not just a heading** [T18] |
+| ✅ | **9.10 Build verified end to end** — 137.6 MB uncompressed, **56.8 MB compressed** against a 300 MB cap, and the shipped EXE launched and ran with zero exceptions in its `Player.log`. | **Under 300 MB** [S1]; **packaging verified to work** [S2, S5]; **the game runs** [D2] |
+
+**Verification.** 113/113 PlayMode tests passing, 0 failed, 0 skipped — up from 90 total with 11 failed.
+
 ## Critical path and risk
 
 **Never cut.** Phase 0 first, because nothing compiles without it. Then: only the new Input System, the menus, health/energy/score, data carried between scenes, the hidden teleports, the two AI agent types, stealth, the code-written layer mask, and patrol with pause. The teleport and two-agent requirements have the most specific wording in the brief and are the easiest to fail on a technicality.
@@ -137,3 +158,30 @@ the real-hardware framerate check — none of which can be done or verified head
 **Cheapest points available.** The submission rules and running the build on your own machine. The packaging penalty is −3 and the machine check is worth 5, both for work that is administrative rather than technical.
 
 **Highest-value work.** Step 3.5, the era system, and Step 6.4, the coherence pass. The brief states the game is judged first and foremost on how interesting it is.
+
+## Phase 10 - Playability pass (bugs that made the game unwinnable)
+
+| # | Step | State |
+|---|------|-------|
+| 10.1 | Time Warden capture: costs health and score, survivable, 3 s cooldown | Done |
+| 10.2 | Warden vision fixed - eye measured from the feet, cone judged on the horizontal bearing | Done |
+| 10.3 | Shadow steal range made horizontal (same `baseOffset` arithmetic) | Done |
+| 10.4 | Chrono Energy regenerates (6/s after 1.5 s idle) - no more dead-end runs | Done |
+| 10.5 | Every silent refusal now says why (era travel, orb throw) | Done |
+| 10.6 | Boss fight verified winnable with real thrown orbs, not just phase logic | Done |
+| 10.7 | Audio coverage: 13 procedural clips, ambience in all three scenes | Done |
+| 10.8 | Full suite 136/136; release build 57 MB compressed, runs clean | Done |
+
+## Phase 11 - Played end to end with mouse and keyboard
+
+| # | Step | State |
+|---|------|-------|
+| 11.1 | Look limit traced to my own warp-and-suppress fallback; guard restored | Done |
+| 11.2 | Warden no longer kills the player 15 s into a new game (patrol, grace, return-to-patrol, non-lethal floor) | Done |
+| 11.3 | Respawn clears hunters, so a death cannot loop | Done |
+| 11.4 | Collector phase 3 given a grace and a survivable rate | Done |
+| 11.5 | "Times Detected" actually counts; being seen costs score | Done |
+| 11.6 | World text fades at close range instead of filling the screen | Done |
+| 11.7 | MuseumNight signposted; objective made directional | Done |
+| 11.8 | Played: menu, museum, FrozenCity 3-era puzzle, ClockCore boss, Victory | Done |
+| 11.9 | Suite 141/141; build 56 MB compressed, runs clean | Done |

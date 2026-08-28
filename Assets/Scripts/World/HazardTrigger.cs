@@ -31,6 +31,7 @@ public sealed class HazardTrigger : PlayerTrigger
 
         nextTick = Time.time + tickSeconds;
 
+        RespawnService.LastCauseOfDeath = "A temporal rift tore through you.";
         GameManager.Instance.TakeDamage(damagePerTick);
         GameManager.Instance.SpendEnergy(energyDrainPerTick);
     }

@@ -208,7 +208,11 @@ def export(objects, path):
         axis_up="Y",
         global_scale=1.0,
         apply_unit_scale=True,
-        bake_space_transform=False,
+        # True: bake the Blender Z-up -> Unity Y-up conversion into the
+        # vertex data instead of leaving it on a root transform. Unity
+        # rebuilds these prefabs from the meshes alone, so a root-level
+        # rotation is discarded and the models arrive lying on their side.
+        bake_space_transform=True,
     )
 
 
