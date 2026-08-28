@@ -169,3 +169,12 @@ Packages/packages-lock.json linguist-generated
 
 # Exceptions for .asset files such as lightning pre-baking
 LightingData.asset     binary
+
+# Baked NavMeshData is a genuinely binary payload (Unity cannot text-serialize
+# it) and was previously left embedded in the gameplay scenes themselves,
+# which forced those whole scene files to binary regardless of the project's
+# ForceText EditorSettings - see NavMeshExternalizer.cs. Now that it lives in
+# its own files here, mark them binary so git never attempts a text/line
+# merge on them; a lost NavMeshData.asset just needs a re-bake, which is
+# trivial, instead of risking silent corruption of a populated scene.
+Assets/NavMesh/*.asset binary

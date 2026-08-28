@@ -36,7 +36,6 @@ public static class FullSceneRebuild
         CoreSystemsBuilder.BuildFromCommandLine();
         SceneConnectionsBuilder.BuildFromCommandLine();
         TutorialTextBuilder.BuildFromCommandLine();
-        HudBuilder.BuildFromCommandLine();
         MinimapBuilder.BuildFromCommandLine();
 
         // FrozenCity
@@ -45,6 +44,12 @@ public static class FullSceneRebuild
 
         // ClockCore
         ClockCoreContentBuilder.BuildFromCommandLine();
+
+        // HudBuilder now builds the HUD in all three gameplay scenes, not
+        // just MuseumNight, so it must run after FrozenCity/ClockCore have
+        // their own Player - running it earlier failed with "no Player in
+        // FrozenCity/ClockCore" because those scenes did not exist yet.
+        HudBuilder.BuildFromCommandLine();
 
         // Final shared polish
         AudioAndVfxBuilder.BuildFromCommandLine();
