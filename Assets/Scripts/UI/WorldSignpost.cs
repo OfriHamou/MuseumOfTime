@@ -49,9 +49,17 @@ public sealed class WorldSignpost : MonoBehaviour
         }
 
         // Face away from the camera, which is what makes the text read the
-        // right way round rather than mirrored.
-        transform.rotation = Quaternion.LookRotation(
-            transform.position - cam.transform.position);
+        // right way round rather than mirrored. Yaw-only: a sign that also
+        // pitches to face a camera above or below it (e.g. this one mounted
+        // high above a doorway, viewed from ground level) reads as hung
+        // crooked rather than flat against the wall.
+        Vector3 toCamera = transform.position - cam.transform.position;
+        toCamera.y = 0f;
+
+        if (toCamera.sqrMagnitude > 0.0001f)
+        {
+            transform.rotation = Quaternion.LookRotation(toCamera);
+        }
 
         if (label == null || player == null)
         {

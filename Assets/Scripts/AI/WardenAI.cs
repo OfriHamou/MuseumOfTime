@@ -74,6 +74,11 @@ public sealed class WardenAI : MonoBehaviour, IFreezable
              "The opening seconds are for reading the objective, not for dying.")]
     [SerializeField] private float huntDelaySeconds = 10f;
 
+    [Tooltip("Score awarded the moment a Chrono Orb freezes this Warden - " +
+             "the game has no lethal weapon, so this is what makes landing a " +
+             "shot feel like it did something (T8).")]
+    [SerializeField] private int freezeScoreReward = 15;
+
     private NavMeshAgent agent;
     private PatrolRoute route;
     private Transform player;
@@ -546,6 +551,10 @@ public sealed class WardenAI : MonoBehaviour, IFreezable
 
     public void Freeze(float seconds)
     {
+        // Re-hitting an already-frozen Warden should top up the duration,
+        // not re-award score/feedback every time an orb happens to land.
+        bool justFrozen = state != State.Frozen;
+
         state = State.Frozen;
         frozenUntil = Time.time + seconds;
 
@@ -553,6 +562,19 @@ public sealed class WardenAI : MonoBehaviour, IFreezable
         {
             agent.isStopped = true;
         }
+
+        if (!justFrozen)
+        {
+            return;
+        }
+
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.AddScore(freezeScoreReward);
+        }
+
+        HudMessageFeed.Post("Time Warden frozen! +" + freezeScoreReward + " score",
+            HudMessageFeed.Tone.Good);
     }
 
     private void OnDrawGizmosSelected()

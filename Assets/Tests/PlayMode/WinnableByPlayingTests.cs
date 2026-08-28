@@ -48,7 +48,7 @@ public sealed class WinnableByPlayingTests
     [UnityTest]
     public IEnumerator TheGameCanBeWonUsingOnlyThingsAPlayerCanDo()
     {
-        // ================= MuseumNight: take the Time Lens ==============
+        // ========= MuseumNight: solve the Temporal Seal puzzle, take the Time Lens =========
         yield return Load("MuseumNight");
 
         GameManager.Instance.ResetGame();
@@ -57,8 +57,24 @@ public sealed class WinnableByPlayingTests
         Assert.IsFalse(GameManager.Instance.State.hasTimeLens,
             "A fresh run should not already hold the Time Lens.");
 
+        // The Lens is the puzzle's reward now, not something sitting beside
+        // the exit - restore each of the three Temporal Seals, in its own
+        // era, through the real interaction cast before it can appear.
+        MuseumTimeSealPuzzle museumPuzzle = MuseumTimeSealPuzzle.Instance;
+        Assert.IsNotNull(museumPuzzle, "MuseumNight has no MuseumTimeSealPuzzle.");
+
+        foreach (TemporalSeal seal in
+                 Object.FindObjectsByType<TemporalSeal>(FindObjectsSortMode.None))
+        {
+            SetEra(seal.RequiredEra);
+            yield return TakeByLookingAtIt(seal.transform, "a Temporal Seal");
+        }
+
+        Assert.IsTrue(museumPuzzle.IsSolved,
+            "Activating all three Temporal Seals through real interaction did not solve the puzzle.");
+
         var lens = Object.FindFirstObjectByType<ItemPickup>();
-        Assert.IsNotNull(lens, "MuseumNight has no Time Lens to find.");
+        Assert.IsNotNull(lens, "Solving the puzzle did not reveal the Time Lens.");
 
         yield return TakeByLookingAtIt(lens.transform, "the Time Lens");
 

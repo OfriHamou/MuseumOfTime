@@ -31,6 +31,10 @@ public sealed class ShadowAI : MonoBehaviour, IFreezable
     [SerializeField] private float stealRange = 1.2f;
     [SerializeField] private int scorePenaltyOnSteal = 60;
 
+    [Tooltip("Score awarded for landing a Chrono Orb on this Shadow, on top " +
+             "of any stolen shards it hands back.")]
+    [SerializeField] private int freezeScoreReward = 15;
+
     [Header("Fairness")]
     [Tooltip("Off in MuseumNight, where the Shadow is only there to be met.")]
     [SerializeField] private bool canStealShards = true;
@@ -252,12 +256,26 @@ public sealed class ShadowAI : MonoBehaviour, IFreezable
     /// </summary>
     public void Freeze(float seconds)
     {
+        // As with the Warden: topping up an already-frozen Shadow's timer
+        // should not re-award score or re-post the feedback message.
+        bool justFrozen = state != State.Frozen;
+
         state = State.Frozen;
         frozenUntil = Time.time + seconds;
 
         if (agent.isOnNavMesh)
         {
             agent.isStopped = true;
+        }
+
+        if (!justFrozen)
+        {
+            return;
+        }
+
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.AddScore(freezeScoreReward);
         }
 
         DropCarriedShards();
@@ -267,7 +285,8 @@ public sealed class ShadowAI : MonoBehaviour, IFreezable
     {
         if (carried.Count == 0)
         {
-            HudMessageFeed.Post("Shadow frozen", HudMessageFeed.Tone.Good);
+            HudMessageFeed.Post("Chronological Shadow frozen! +" + freezeScoreReward + " score",
+                HudMessageFeed.Tone.Good);
             return;
         }
 

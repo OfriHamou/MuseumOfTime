@@ -44,11 +44,22 @@ public sealed class SceneExitTrigger : PlayerTrigger
         if (!HasRequiredItem())
         {
             LastExitSucceeded = false;
+
+            // Walking into a locked exit and having nothing happen at all
+            // reads as a bug, not a gate - say what is missing.
+            HudMessageFeed.Post(RejectionMessage(), HudMessageFeed.Tone.Bad);
             return;
         }
 
         LastExitSucceeded = true;
         sceneLoader.LoadScene(targetScene);
+    }
+
+    private string RejectionMessage()
+    {
+        return requiredItem == RequiredItem.TimeLens
+            ? "Portal unstable - acquire the Time Lens first"
+            : "This path is not open yet - you need the Chrono Hourglass";
     }
 
     private bool HasRequiredItem()
