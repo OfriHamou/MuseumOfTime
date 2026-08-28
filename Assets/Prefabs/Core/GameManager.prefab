@@ -11,7 +11,6 @@ GameObject:
   - component: {fileID: 406385857278714929}
   - component: {fileID: 1873113285945637003}
   - component: {fileID: 1967141600936847657}
-  - component: {fileID: 8556068122630988316}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -61,6 +60,10 @@ MonoBehaviour:
     hasCheckpoint: 0
     checkpointSceneName: 
     checkpointPosition: {x: 0, y: 0, z: 0}
+    checkpointEra: 1
+    currentEra: 1
+  energyRegenPerSecond: 9
+  energyRegenDelay: 1.5
 --- !u!114 &1967141600936847657
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -73,15 +76,3 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4fa1558f6fc62f049b8bba9b6881308a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SceneLoader
---- !u!114 &8556068122630988316
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 776142710915286028}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 14a43202c30f6f14ea531ae609cd8632, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GameStateDebugTester
