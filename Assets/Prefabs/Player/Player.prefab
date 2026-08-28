@@ -115,7 +115,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 2542772548314917624}
-  - {fileID: 5394048867929628521}
+  - {fileID: 4355756314079933215}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!143 &6575881059198277549
@@ -292,7 +292,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MuseumOfTime.Runtime::ChronoHourglass
   slowScale: 0.3
-  energyDrainPerSecond: 18
+  energyDrainPerSecond: 9
   alwaysAvailable: 0
 --- !u!114 &5493056981706145912
 MonoBehaviour:
@@ -309,7 +309,7 @@ MonoBehaviour:
   orbPrefab: {fileID: 4501555944457076929, guid: 676e46c47835143428d07c443f8463ed, type: 3}
   launchForce: 14
   cooldown: 0.4
-  energyCost: 5
+  energyCost: 4
   muzzleDistance: 1.2
 --- !u!1 &7554771264661164093
 GameObject:
@@ -343,7 +343,7 @@ Transform:
   - {fileID: 3661599748568779290}
   m_Father: {fileID: 4667274626914980314}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1001 &5571299775312459906
+--- !u!1001 &4321336021328024820
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -413,8 +413,8 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: ac5ad4ab5358b9941b358e1b47fe59f8, type: 3}
---- !u!4 &5394048867929628521 stripped
+--- !u!4 &4355756314079933215 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: ac5ad4ab5358b9941b358e1b47fe59f8, type: 3}
-  m_PrefabInstance: {fileID: 5571299775312459906}
+  m_PrefabInstance: {fileID: 4321336021328024820}
   m_PrefabAsset: {fileID: 0}

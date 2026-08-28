@@ -72,8 +72,14 @@ public sealed class CollectorPhaseLabel : MonoBehaviour
         // The name and what it is, every frame. It was an unlabelled shape in
         // a room, and "I don't get what the boss is" is the fair reading of an
         // enemy the game never introduces.
-        const string title =
-            "<color=#C9B3FF>THE COLLECTOR</color>\n" +
+        int phase = collector.CurrentStage == Collector.Stage.Shielded ? 1
+            : collector.CurrentStage == Collector.Stage.Present ? 2 : 3;
+
+        // Say how far through the fight this is. Without it there is no sense
+        // of progress at all - each phase looks like the last one failing.
+        string title =
+            "<color=#C9B3FF>THE COLLECTOR</color>  <size=60%>PHASE " + phase +
+            " OF 3</size>\n" +
             "<size=60%>It is unmaking the timeline. Undo it with the Chrono Orb.</size>\n";
 
         TimeEra needed;

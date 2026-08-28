@@ -10,7 +10,7 @@ public sealed class ChronoOrbLauncher : MonoBehaviour
     [SerializeField] private GameObject orbPrefab;
     [SerializeField] private float launchForce = 14f;
     [SerializeField] private float cooldown = 0.4f;
-    [SerializeField] private float energyCost = 5f;
+    [SerializeField] private float energyCost = 4f;
 
     [Tooltip("How far in front of the camera the orb appears, so it does " +
              "not spawn inside Noa's own collider.")]
@@ -71,7 +71,14 @@ public sealed class ChronoOrbLauncher : MonoBehaviour
 
         GameObject orb = Instantiate(orbPrefab, spawn, cam.rotation);
         LastOrb = orb.GetComponent<ChronoOrb>();
-        LastOrb?.Launch(cam.forward, launchForce);
+
+        var hourglass = GetComponent<ChronoHourglass>();
+
+        if (LastOrb != null)
+        {
+            LastOrb.ThrownWhileTimeSlowed = hourglass != null && hourglass.IsSlowing;
+            LastOrb.Launch(cam.forward, launchForce);
+        }
 
         nextAllowedTime = Time.unscaledTime + cooldown;
         ThrownCount++;

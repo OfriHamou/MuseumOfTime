@@ -10,7 +10,10 @@ using UnityEngine;
 public sealed class ChronoHourglass : MonoBehaviour
 {
     [SerializeField] private float slowScale = 0.3f;
-    [SerializeField] private float energyDrainPerSecond = 18f;
+    [Tooltip("Energy per second while slowing time. At 18 a full bar bought " +
+             "barely five seconds, which is less than one aimed throw takes " +
+             "once the slowdown has stretched the orb's flight.")]
+    [SerializeField] private float energyDrainPerSecond = 9f;
 
     [Tooltip("Ignore the item flag. For testing the first scene only.")]
     [SerializeField] private bool alwaysAvailable;

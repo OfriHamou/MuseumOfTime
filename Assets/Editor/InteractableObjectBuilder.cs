@@ -207,7 +207,27 @@ public static class InteractableObjectBuilder
         if (p != null) { p.objectReferenceValue = collector; }
         so.ApplyModifiedPropertiesWithoutUndo();
 
-        Debug.Log("COLLECTOR LABEL OK");
+        // A forgiving catch area, so a near miss with an arcing projectile
+        // counts. It is a trigger, so it does not change where anyone can walk.
+        Transform oldVolume = collector.transform.Find("HitVolume");
+        if (oldVolume != null) { Object.DestroyImmediate(oldVolume.gameObject); }
+
+        var volume = new GameObject("HitVolume");
+        volume.transform.SetParent(collector.transform, false);
+        volume.transform.localPosition = Vector3.zero;
+
+        SphereCollider sphere = volume.AddComponent<SphereCollider>();
+        sphere.isTrigger = true;
+        sphere.radius = 1.9f;
+
+        var hit = volume.AddComponent<CollectorHitVolume>();
+
+        var vso = new SerializedObject(hit);
+        SerializedProperty vp = vso.FindProperty("collector");
+        if (vp != null) { vp.objectReferenceValue = collector; }
+        vso.ApplyModifiedPropertiesWithoutUndo();
+
+        Debug.Log("COLLECTOR LABEL + HIT VOLUME OK");
     }
 
     // ==================================================================
