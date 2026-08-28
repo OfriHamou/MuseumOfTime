@@ -178,3 +178,15 @@ LightingData.asset     binary
 # merge on them; a lost NavMeshData.asset just needs a re-bake, which is
 # trivial, instead of risking silent corruption of a populated scene.
 Assets/NavMesh/*.asset binary
+
+# TerrainData embeds its heightmap/alphamap arrays as a genuinely binary
+# payload, same as NavMeshData above, but this one file was missed when the
+# NavMesh exception was added. Marking it unity-yaml (the *.asset default)
+# let git silently normalize line endings inside that binary payload on a
+# past checkout/merge, corrupting it (found during a 2026-08-28 cleanup pass
+# as "Unknown error occurred while loading" on every FrozenCity scene load -
+# confirmed unparseable even by Unity's own native importer, fixed by
+# regenerating the sculpt via a targeted repair, see Simplification_Report.md).
+# A lost/corrupted FrozenCityTerrainData.asset just needs a re-sculpt via
+# TerrainBuilder.cs, trivial, instead of risking this again.
+Assets/Terrain/FrozenCityTerrainData.asset binary
