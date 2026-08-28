@@ -276,12 +276,40 @@ public static class ScenePolishBuilder
 
         // A clock face on the approach (-Z) side, so the tower reads as a
         // clock and as the objective from spawn.
+        //
+        // It has to be LIT to do that job. In plain brass it was a dim grey
+        // square on a grey tower in fog - invisible from the far end of the
+        // city, which is precisely where the player needs to be able to pick
+        // the objective out. A glowing dial is also the honest read: this is
+        // the one clock in a city where time has stopped.
+        Material dial = Emissive("ClockDial", new Color(1f, 0.86f, 0.55f), 2.6f);
+
         Cube(root, "ClockFace", basePos + new Vector3(0f, 16f, -3.2f),
-             new Vector3(4f, 4f, 0.3f), Vector3.zero, brass, false);
-        Cube(root, "ClockHandHour", basePos + new Vector3(0f, 16f, -3.4f),
+             new Vector3(4f, 4f, 0.3f), Vector3.zero, dial, false);
+
+        // A rim, so the lit dial reads as a face rather than a glowing panel.
+        Cube(root, "ClockRim", basePos + new Vector3(0f, 16f, -3.15f),
+             new Vector3(4.6f, 4.6f, 0.25f), Vector3.zero, roof, false);
+
+        // Hands sit in front of the dial and stay dark, so they silhouette
+        // against it instead of disappearing into it.
+        Cube(root, "ClockHandHour", basePos + new Vector3(0f, 16f, -3.5f),
              new Vector3(0.18f, 1.4f, 0.18f), new Vector3(0f, 0f, 25f), roof, false);
-        Cube(root, "ClockHandMinute", basePos + new Vector3(0f, 16f, -3.4f),
+        Cube(root, "ClockHandMinute", basePos + new Vector3(0f, 16f, -3.5f),
              new Vector3(0.14f, 2.1f, 0.14f), new Vector3(0f, 0f, 110f), roof, false);
+
+        // And a light of its own, so the dial throws its colour onto the
+        // tower face rather than looking like a decal stuck to it.
+        GameObject glow = new GameObject("ClockFaceGlow");
+        glow.transform.SetParent(root.transform, false);
+        glow.transform.position = basePos + new Vector3(0f, 16f, -4.5f);
+
+        Light dialLight = glow.AddComponent<Light>();
+        dialLight.type = LightType.Point;
+        dialLight.color = new Color(1f, 0.86f, 0.55f);
+        dialLight.intensity = 12f;
+        dialLight.range = 22f;
+        dialLight.shadows = LightShadows.None;
 
         // A stepped roof cap over the belfry.
         Cube(root, "TowerRoof", basePos + new Vector3(0f, 28.5f, 0f),
@@ -338,7 +366,16 @@ public static class ScenePolishBuilder
                      new Vector3(14f, 0f, 14f), new Vector3(-14f, 0f, 14f),
                      new Vector3(14f, 0f, -14f), new Vector3(-14f, 0f, -14f),
                      new Vector3(16f, 0f, 0f), new Vector3(-16f, 0f, 0f),
-                     new Vector3(0f, 0f, 16f), new Vector3(0f, 0f, -16f),
+                     new Vector3(0f, 0f, 16f),
+
+                     // Flanking the entrance rather than standing in it. A
+                     // single column used to sit at (0, 0, -16) - one metre in
+                     // front of the player spawn at (0, 0.1, -15) and directly
+                     // between the third-person camera and Noa. It went
+                     // unnoticed while the LOD models were importing at 1/100
+                     // scale (a 4 cm pebble); at their real 4 m it blocks half
+                     // the screen on the frame the scene opens.
+                     new Vector3(-4.5f, 0f, -16f), new Vector3(4.5f, 0f, -16f),
                  })
         {
             Prop(ColumnPrefab, root, p, Vector3.one, Vector3.zero);
@@ -453,6 +490,40 @@ public static class ScenePolishBuilder
     // -----------------------------------------------------------------
     // Primitive / prefab helpers
     // -----------------------------------------------------------------
+
+    /// <summary>
+    /// A cached emissive material under Assets/Materials/Dressing, so repeat
+    /// runs reuse the asset instead of leaking a new one into the scene.
+    /// </summary>
+    private static Material Emissive(string name, Color colour, float intensity)
+    {
+        const string folder = "Assets/Materials/Dressing";
+        string path = folder + "/" + name + ".mat";
+
+        var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+
+        if (mat == null)
+        {
+            if (!AssetDatabase.IsValidFolder(folder))
+            {
+                AssetDatabase.CreateFolder("Assets/Materials", "Dressing");
+            }
+
+            mat = new Material(Shader.Find("Universal Render Pipeline/Lit")) { name = name };
+            AssetDatabase.CreateAsset(mat, path);
+        }
+
+        mat.SetColor("_BaseColor", colour);
+        mat.SetFloat("_Smoothness", 0.4f);
+        mat.SetFloat("_Metallic", 0f);
+
+        mat.EnableKeyword("_EMISSION");
+        mat.SetColor("_EmissionColor", colour * intensity);
+        mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+
+        EditorUtility.SetDirty(mat);
+        return mat;
+    }
 
     private static GameObject Cube(GameObject root, string name, Vector3 pos, Vector3 scale, Vector3 euler, Material mat, bool collide)
     {

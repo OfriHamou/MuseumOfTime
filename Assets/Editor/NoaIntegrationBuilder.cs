@@ -228,10 +228,31 @@ public static class NoaIntegrationBuilder
 
     private static void AttachNoaModel(GameObject playerRoot)
     {
-        Transform existing = playerRoot.transform.Find("NoaModel");
-        if (existing != null)
+        // Remove EVERY existing character visual, not just the first child
+        // that happens to be called "NoaModel".
+        //
+        // The MuseumNight player is a prefab instance of Player.prefab, and
+        // this builder updates both the prefab AND the scene instance. The
+        // prefab's own NoaModel therefore already exists on the instance by
+        // the time the instance is processed, and Transform.Find returns only
+        // the first match - so each run left the old buried model in place and
+        // added a second one beside it. Two Noas, one of them a metre
+        // underground.
+        //
+        // Any child carrying a SkinnedMeshRenderer is a character visual; the
+        // player root has no other use for one.
+        for (int i = playerRoot.transform.childCount - 1; i >= 0; i--)
         {
-            Object.DestroyImmediate(existing.gameObject);
+            Transform child = playerRoot.transform.GetChild(i);
+
+            bool isCharacterVisual =
+                child.name == "NoaModel" ||
+                child.GetComponentInChildren<SkinnedMeshRenderer>(true) != null;
+
+            if (isCharacterVisual)
+            {
+                Object.DestroyImmediate(child.gameObject);
+            }
         }
 
         GameObject modelPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath);
@@ -265,10 +286,32 @@ public static class NoaIntegrationBuilder
         anim.applyRootMotion = false;   // movement stays script-driven
     }
 
-    /// <summary>Scales the model to ~1.75 m and drops its feet to y = 0.</summary>
+    /// <summary>
+    /// Scales the model to ~1.75 m and puts its feet on the floor.
+    ///
+    /// The previous version measured the bind pose in WORLD space and then
+    /// subtracted that from LOCAL position, which is only equivalent while the
+    /// player root sits at world y = 0. It does not: the player spawns at
+    /// y = 0.08, and the Mixamo mesh bounds are expressed about the root bone
+    /// rather than the model origin, so the two errors compounded into a
+    /// localPosition of (0, -1, 0) - Noa rendered buried to the waist, with
+    /// her feet 0.95 m below a floor whose top surface is y = 0.
+    ///
+    /// Measuring in the PLAYER ROOT's own space makes the result independent
+    /// of where in the world the player happens to be.
+    /// </summary>
     private static void FitToHuman(GameObject inst)
     {
-        if (!TryBindPoseBounds(inst, out Bounds bounds) || bounds.size.y < 0.01f)
+        Transform frame = inst.transform.parent;
+        if (frame == null)
+        {
+            return;
+        }
+
+        inst.transform.localPosition = Vector3.zero;
+        inst.transform.localScale = Vector3.one;
+
+        if (!TryBindPoseBounds(inst, frame, out Bounds bounds) || bounds.size.y < 0.01f)
         {
             return;
         }
@@ -276,18 +319,35 @@ public static class NoaIntegrationBuilder
         float scale = TargetHeight / bounds.size.y;
         inst.transform.localScale = Vector3.one * scale;
 
-        if (TryBindPoseBounds(inst, out Bounds scaled))
+        if (!TryBindPoseBounds(inst, frame, out Bounds scaled))
         {
-            inst.transform.localPosition -= new Vector3(0f, scaled.min.y, 0f);
+            return;
         }
+
+        // A CharacterController rests with its capsule bottom skinWidth above
+        // the ground, so dropping the feet exactly to the capsule bottom would
+        // leave Noa hovering by that much. Take it off as well.
+        float skin = 0f;
+        var controller = frame.GetComponent<CharacterController>();
+        if (controller != null)
+        {
+            skin = controller.skinWidth;
+        }
+
+        inst.transform.localPosition = new Vector3(0f, -scaled.min.y - skin, 0f);
+
+        Debug.Log("NOA: model fitted - scale " + scale.ToString("F3") +
+                  ", localPosition " + inst.transform.localPosition +
+                  " (measured in " + frame.name + " space)");
     }
 
     /// <summary>
-    /// World-space bounds of the model's bind-pose meshes. Uses the shared
-    /// mesh bounds (not SkinnedMeshRenderer.bounds) so it is deterministic in
-    /// edit mode with no Animator playing.
+    /// Bounds of the model's bind-pose meshes, expressed in <paramref
+    /// name="frame"/>'s local space. Uses the shared mesh bounds (not
+    /// SkinnedMeshRenderer.bounds) so it is deterministic in edit mode with no
+    /// Animator playing.
     /// </summary>
-    private static bool TryBindPoseBounds(GameObject inst, out Bounds bounds)
+    private static bool TryBindPoseBounds(GameObject inst, Transform frame, out Bounds bounds)
     {
         bounds = new Bounds();
         bool any = false;
@@ -300,7 +360,7 @@ public static class NoaIntegrationBuilder
             }
 
             Bounds local = smr.sharedMesh.bounds;
-            Matrix4x4 m = smr.transform.localToWorldMatrix;
+            Matrix4x4 m = frame.worldToLocalMatrix * smr.transform.localToWorldMatrix;
             Vector3 c = m.MultiplyPoint3x4(local.center);
             Vector3 e = local.extents;
             Vector3 worldExtents = new Vector3(

@@ -39,12 +39,23 @@ public sealed class EraColorGrading : MonoBehaviour
 
         if (!volume.profile.TryGet(out colorAdjustments))
         {
-            colorAdjustments = volume.profile.Add<ColorAdjustments>(true);
+            // 'false': override NOTHING by default.
+            //
+            // Add<T>(true) turns on overrideState for EVERY parameter, and
+            // this volume sits at priority 10 - above the scene's post-process
+            // volume at priority 0. So it was overriding postExposure,
+            // contrast and saturation with their zero defaults and wiping out
+            // the scene grade entirely. This volume owns the era TINT and
+            // nothing else.
+            colorAdjustments = volume.profile.Add<ColorAdjustments>(false);
         }
 
         colorAdjustments.active = true;
         colorAdjustments.colorFilter.overrideState = true;
         colorAdjustments.hueShift.overrideState = true;
+        colorAdjustments.postExposure.overrideState = false;
+        colorAdjustments.contrast.overrideState = false;
+        colorAdjustments.saturation.overrideState = false;
     }
 
     private void OnEnable()

@@ -44,8 +44,7 @@ public static class AssetPrefabBuilder
         Directory.CreateDirectory(PrefabFolder);
         AssetDatabase.Refresh();
 
-        Material marble = AssetDatabase.LoadAssetAtPath<Material>(
-            "Assets/Materials/Museum/MuseumMarble.mat");
+        Material marble = ResolveMarble();
 
         BuildFracturePrefab("ClockOfCreation", marble);
         BuildFracturePrefab("FrozenStatue", marble);
@@ -55,6 +54,55 @@ public static class AssetPrefabBuilder
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
+    }
+
+    /// <summary>
+    /// The stone material for the fracture and LOD props, guaranteed non-null.
+    ///
+    /// This used to be a bare LoadAssetAtPath on MuseumMarble.mat, which reads
+    /// as safe and was not: MuseumBuilder is what CREATES that material, and it
+    /// runs four steps later in FullSceneRebuild. On a clean rebuild the load
+    /// returned null, every LOD tier and every fracture shard was written with
+    /// an empty material slot, and Unity drew all of them in the magenta error
+    /// shader - two of the graded requirement props (T10, T11) shipped bright
+    /// pink at the foot of the clock tower.
+    ///
+    /// Nothing warned, because a null material is not an error to Unity. So
+    /// rather than depend on builder order, make one if it is missing and say
+    /// so.
+    /// </summary>
+    private static Material ResolveMarble()
+    {
+        const string path = "Assets/Materials/Museum/MuseumMarble.mat";
+
+        var marble = AssetDatabase.LoadAssetAtPath<Material>(path);
+
+        if (marble != null)
+        {
+            return marble;
+        }
+
+        Debug.LogWarning(
+            "MuseumMarble.mat did not exist yet, so the LOD and fracture props " +
+            "would have been built with null materials and rendered magenta. " +
+            "Creating a stand-in; MuseumBuilder will overwrite it in place.");
+
+        Directory.CreateDirectory("Assets/Materials/Museum");
+        AssetDatabase.Refresh();
+
+        marble = new Material(Shader.Find("Universal Render Pipeline/Lit"))
+        {
+            name = "MuseumMarble",
+        };
+
+        marble.SetColor("_BaseColor", new Color(0.90f, 0.89f, 0.86f));
+        marble.SetFloat("_Smoothness", 0.65f);
+        marble.SetFloat("_Metallic", 0f);
+
+        AssetDatabase.CreateAsset(marble, path);
+        AssetDatabase.SaveAssets();
+
+        return marble;
     }
 
     // -----------------------------------------------------------------
@@ -98,6 +146,11 @@ public static class AssetPrefabBuilder
             shard.transform.localPosition = piece.transform.position;
             shard.transform.localRotation = piece.transform.rotation;
 
+            // Same transform-preservation as the LOD tiers - see the note in
+            // BuildLodPrefab. Without it the shards are centimetre-scale and
+            // rotated onto their side.
+            CopyLocalTransform(piece.transform, shard.transform);
+
             shard.AddComponent<MeshFilter>().sharedMesh = piece.sharedMesh;
             shard.AddComponent<MeshRenderer>().sharedMaterial = material;
 
@@ -120,6 +173,7 @@ public static class AssetPrefabBuilder
         {
             var whole = new GameObject("Whole");
             whole.transform.SetParent(intact.transform, false);
+            CopyLocalTransform(pieces[0].transform, whole.transform);
             whole.AddComponent<MeshFilter>().sharedMesh = pieces[0].sharedMesh;
             whole.AddComponent<MeshRenderer>().sharedMaterial = material;
         }
@@ -184,6 +238,16 @@ public static class AssetPrefabBuilder
             var tier = new GameObject(label + "_LOD" + i);
             tier.transform.SetParent(root.transform, false);
 
+            // Carry the source node's TRANSFORM across, not just its mesh.
+            //
+            // Each FBX node holds rotation (89.98, 0, 0) - Blender Z-up to
+            // Unity Y-up - and scale 100, which the importer's fileScale of
+            // 0.01 cancels back to 1. Creating a bare GameObject and assigning
+            // only sharedMesh threw both away, so every LOD tier and every
+            // Voronoi shard became a ~1 cm object lying on its side. The
+            // models were never wrong; this copy step was missing.
+            CopyLocalTransform(tiers[i].transform, tier.transform);
+
             tier.AddComponent<MeshFilter>().sharedMesh = tiers[i].sharedMesh;
             MeshRenderer renderer = tier.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = material;
@@ -204,5 +268,16 @@ public static class AssetPrefabBuilder
 
         Debug.Log("LOD PREFAB OK: " + label + " tris " +
                   counts[0] + " / " + counts[1] + " / " + counts[2]);
+    }
+
+    /// <summary>
+    /// Copies an imported FBX node's local transform onto the rebuilt object,
+    /// so the importer's axis conversion and unit scaling survive.
+    /// </summary>
+    private static void CopyLocalTransform(Transform source, Transform destination)
+    {
+        destination.localPosition = source.localPosition;
+        destination.localRotation = source.localRotation;
+        destination.localScale = source.localScale;
     }
 }
