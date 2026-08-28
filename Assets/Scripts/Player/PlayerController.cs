@@ -27,6 +27,10 @@ public sealed class PlayerController : MonoBehaviour
     [Header("Gravity and jumping")]
     [SerializeField] private float gravity = -20f;
 
+    [Tooltip("Fastest the character may fall. A cap is what stops a long drop " +
+             "building enough speed to pass through the floor in one frame.")]
+    [SerializeField] private float terminalVelocity = -35f;
+
     [Tooltip("Small downward force while grounded, so the controller stays " +
              "pinned to the floor instead of stepping off every slope.")]
     [SerializeField] private float groundedForce = -2f;
@@ -49,6 +53,20 @@ public sealed class PlayerController : MonoBehaviour
     private Transform cameraTransform;
 
     private float verticalVelocity;
+
+    /// <summary>
+    /// Clears accumulated fall speed. Called when the player is teleported.
+    ///
+    /// This was the never-ending death loop. Respawning moved the character
+    /// but left verticalVelocity as it was at the bottom of the fall, so on
+    /// the very next frame they were driven downwards fast enough to pass
+    /// through the floor they had just been placed on - falling again,
+    /// dying again, respawning again, forever.
+    /// </summary>
+    public void ResetFallVelocity()
+    {
+        verticalVelocity = 0f;
+    }
     private float timeSinceGrounded;
 
     /// <summary>True while the controller is touching the ground.</summary>
@@ -176,6 +194,11 @@ public sealed class PlayerController : MonoBehaviour
         }
 
         verticalVelocity += gravity * Time.deltaTime;
+
+        // Terminal velocity. Without a floor on this, a long fall builds a
+        // speed large enough to cross a 0.2 m floor slab in a single frame,
+        // and the character tunnels straight through the level.
+        verticalVelocity = Mathf.Max(verticalVelocity, terminalVelocity);
     }
 
     private bool CanJump()

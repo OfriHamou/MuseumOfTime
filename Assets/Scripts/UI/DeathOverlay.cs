@@ -40,6 +40,9 @@ public sealed class DeathOverlay : MonoBehaviour
     /// <summary>The last headline displayed. Used by tests.</summary>
     public string LastHeadline { get; private set; } = "";
 
+    /// <summary>A literal line break for the detail copy.</summary>
+    private const string NewLine = "\n";
+
     private void Awake()
     {
         Instance = this;
@@ -63,22 +66,26 @@ public sealed class DeathOverlay : MonoBehaviour
     /// Shows the death screen, holds it, then fades out. The caller awaits
     /// this so the respawn does not happen behind the fade.
     /// </summary>
-    public System.Collections.IEnumerator Show(string cause)
+    public System.Collections.IEnumerator Show(string cause, bool gameOver = false)
     {
         ShowCount++;
         IsShowing = true;
-        LastHeadline = "YOU DIED";
+        LastHeadline = gameOver ? "GAME OVER" : "YOU DIED";
 
         if (headlineText != null)
         {
-            headlineText.text = "YOU DIED";
+            headlineText.text = LastHeadline;
         }
 
         if (detailText != null)
         {
+            string outcome = gameOver
+                ? "Returning to the main menu."
+                : "Returning you to your last Time Anchor.";
+
             detailText.text = string.IsNullOrWhiteSpace(cause)
-                ? "Returning you to your last Time Anchor."
-                : cause + "\nReturning you to your last Time Anchor.";
+                ? outcome
+                : cause + NewLine + outcome;
         }
 
         // Unscaled throughout: the Chrono Hourglass may well have been running

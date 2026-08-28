@@ -91,6 +91,12 @@ public static class FullSceneRebuild
         // layer holds only the player marker and the map is blank (T18).
         MinimapGeometryBuilder.BuildFromCommandLine();
 
+        // Late, and deliberately after CollectibleLookBuilder: it replaces the
+        // placeholder shape inside the bobbing "Beacon" holder that builder
+        // creates, and gives every scene exit an actual framed portal rather
+        // than an invisible trigger with a light in it.
+        InteractableObjectBuilder.BuildFromCommandLine();
+
         // Import-side size caps for the 300 MB deliverable (S1).
         BuildSizeBuilder.BuildFromCommandLine();
 

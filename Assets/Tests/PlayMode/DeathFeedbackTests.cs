@@ -51,17 +51,23 @@ public sealed class DeathFeedbackTests
     }
 
     [UnityTest]
-    public IEnumerator RunningOutOfHealthShowsTheDeathScreenAndNamesTheCause()
+    public IEnumerator DyingWithNoAnchorIsAGameOverAndReturnsToTheMainMenu()
     {
         var overlay = Object.FindFirstObjectByType<DeathOverlay>(FindObjectsInactive.Include);
         Assert.IsNotNull(overlay, "MuseumNight has no DeathOverlay.");
+
+        // MuseumNight has no Time Anchors at all - T21 puts them in scenes 2
+        // and 3 - so there is nowhere earned to go back to. Respawning here
+        // just dropped the player at the start with no acknowledgement they
+        // had died, and if the spot was unsafe it looped forever.
+        Assert.IsFalse(GameManager.Instance.State.hasCheckpoint,
+            "This test needs a run with no anchor set.");
 
         int before = overlay.ShowCount;
 
         RespawnService.LastCauseOfDeath = "A temporal rift tore through you.";
         GameManager.Instance.TakeDamage(GameManager.Instance.State.maxHealth);
 
-        // The overlay fades in over a fraction of a second.
         float deadline = Time.unscaledTime + 3f;
 
         while (overlay.ShowCount == before && Time.unscaledTime < deadline)
@@ -69,69 +75,103 @@ public sealed class DeathFeedbackTests
             yield return null;
         }
 
-        Assert.Greater(
-            overlay.ShowCount, before,
-            "Health reached zero and no death screen appeared. Dying was " +
-            "invisible: the player was teleported and healed with nothing on " +
-            "screen to say so.");
+        Assert.Greater(overlay.ShowCount, before,
+            "Health reached zero and no death screen appeared.");
 
-        Assert.AreEqual("YOU DIED", overlay.LastHeadline);
+        Assert.AreEqual("GAME OVER", overlay.LastHeadline,
+            "With no anchor to return to, a death is the end of the run and " +
+            "should say so rather than silently putting the player back.");
 
-        Assert.IsTrue(overlay.IsShowing,
-            "The death screen should still be held on screen at this point, " +
-            "long enough to be read.");
+        // And it must actually leave for the menu.
+        float until = Time.unscaledTime + 12f;
+
+        while (SceneManager.GetActiveScene().name != "MainMenu" &&
+               Time.unscaledTime < until)
+        {
+            yield return null;
+        }
+
+        Assert.AreEqual("MainMenu", SceneManager.GetActiveScene().name,
+            "A game over never reached the main menu, so the player is left " +
+            "in the level with nothing to do.");
     }
 
     /// <summary>
-    /// The respawn must wait for the screen, or the player is moved behind a
-    /// fade and never sees the death that caused it.
+    /// With an anchor armed, T21's behaviour still holds: the player goes back
+    /// to it rather than being thrown out to the menu.
     /// </summary>
     [UnityTest]
-    public IEnumerator TheRespawnWaitsForTheDeathScreenToFinish()
+    public IEnumerator DyingWithAnAnchorReturnsToItInsteadOfEndingTheRun()
     {
+        var overlay = Object.FindFirstObjectByType<DeathOverlay>(FindObjectsInactive.Include);
         var respawn = Object.FindFirstObjectByType<RespawnService>();
         Assert.IsNotNull(respawn, "MuseumNight has no RespawnService.");
 
-        var overlay = Object.FindFirstObjectByType<DeathOverlay>(FindObjectsInactive.Include);
+        GameManager.Instance.SaveCheckpoint("MuseumNight", new Vector3(2f, 1f, 2f));
+        Assert.IsTrue(GameManager.Instance.State.hasCheckpoint);
+
         int respawnsBefore = respawn.RespawnCount;
 
+        RespawnService.LastCauseOfDeath = "A temporal rift tore through you.";
         GameManager.Instance.TakeDamage(GameManager.Instance.State.maxHealth);
 
-        // While the screen is up, the respawn must NOT have happened yet.
-        float deadline = Time.unscaledTime + 2f;
-        bool sawScreenBeforeRespawn = false;
+        float deadline = Time.unscaledTime + 12f;
 
-        while (Time.unscaledTime < deadline)
-        {
-            if (overlay.IsShowing && respawn.RespawnCount == respawnsBefore)
-            {
-                sawScreenBeforeRespawn = true;
-                break;
-            }
-
-            yield return null;
-        }
-
-        Assert.IsTrue(
-            sawScreenBeforeRespawn,
-            "The player was respawned before the death screen was shown, so " +
-            "the death is invisible again.");
-
-        // And it must eventually finish and respawn them.
-        float until = Time.unscaledTime + 8f;
-
-        while (respawn.RespawnCount == respawnsBefore && Time.unscaledTime < until)
+        while (respawn.RespawnCount == respawnsBefore && Time.unscaledTime < deadline)
         {
             yield return null;
         }
 
-        Assert.Greater(
-            respawn.RespawnCount, respawnsBefore,
-            "The death screen never handed back to the respawn, so the run " +
-            "would be stuck on a black screen forever.");
+        Assert.AreEqual("YOU DIED", overlay.LastHeadline,
+            "With an anchor armed the run continues, so the screen should not " +
+            "announce a game over.");
 
-        Assert.Greater(
-            GameManager.Instance.State.currentHealth, 0,
-            "The player was respawned without any health.");
+        Assert.Greater(respawn.RespawnCount, respawnsBefore,
+            "Dying with an anchor armed did not return the player to it (T21).");
+
+        Assert.AreEqual("MuseumNight", SceneManager.GetActiveScene().name,
+            "Dying with an anchor armed threw the player out to the menu " +
+            "instead of returning them to the anchor.");
+
+        Assert.Greater(GameManager.Instance.State.currentHealth, 0,
+            "The player was returned to the anchor with no health.");
+    }
+
+    /// <summary>
+    /// The loop the player actually hit: die, respawn, die again immediately.
+    /// </summary>
+    [UnityTest]
+    public IEnumerator DyingRepeatedlyEndsTheRunRatherThanLooping()
+    {
+        var respawn = Object.FindFirstObjectByType<RespawnService>();
+
+        GameManager.Instance.SaveCheckpoint("MuseumNight", new Vector3(2f, 1f, 2f));
+
+        // First death: returns to the anchor.
+        GameManager.Instance.TakeDamage(GameManager.Instance.State.maxHealth);
+
+        float deadline = Time.unscaledTime + 12f;
+
+        while (respawn.RespawnCount == 0 && Time.unscaledTime < deadline)
+        {
+            yield return null;
+        }
+
+        Assert.Greater(respawn.RespawnCount, 0, "The first death never respawned.");
+
+        // Second death, straight away - the anchor is evidently not safe.
+        GameManager.Instance.TakeDamage(GameManager.Instance.State.maxHealth);
+
+        float until = Time.unscaledTime + 12f;
+
+        while (SceneManager.GetActiveScene().name != "MainMenu" &&
+               Time.unscaledTime < until)
+        {
+            yield return null;
+        }
+
+        Assert.AreEqual("MainMenu", SceneManager.GetActiveScene().name,
+            "Dying again moments after respawning sent the player back to the " +
+            "same unsafe spot. That is the never-ending die-respawn loop.");
     }
 }
