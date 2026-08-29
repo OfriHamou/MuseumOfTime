@@ -202,8 +202,7 @@ public sealed class Collector : MonoBehaviour
                     stage = Stage.Present;
 
                     HudMessageFeed.Post(
-                        "Shield broken! It has summoned a Warden - now hit it " +
-                        "in the PRESENT (press R)",
+                        "The shield shatters. Something else now stirs to defend it.",
                         HudMessageFeed.Tone.Good);
                 }
                 else
@@ -212,7 +211,7 @@ public sealed class Collector : MonoBehaviour
 
                     HudMessageFeed.Post(
                         "The shield cracks - " + left + " more hit" +
-                        (left == 1 ? "" : "s") + " in the PAST",
+                        (left == 1 ? "" : "s") + " needed",
                         HudMessageFeed.Tone.Good);
                 }
 
@@ -229,8 +228,7 @@ public sealed class Collector : MonoBehaviour
                 erosionBeginsAt = Time.time + erosionGraceSeconds;
 
                 HudMessageFeed.Post(
-                    "It retreats into the FUTURE. Press R, then HOLD CTRL to " +
-                    "slow time and hit it while you hold it",
+                    "It flees to a moment that has not happened yet.",
                     HudMessageFeed.Tone.Good);
 
                 break;
@@ -255,8 +253,7 @@ public sealed class Collector : MonoBehaviour
                 if (!slowed)
                 {
                     HudMessageFeed.Post(
-                        "The orb passes straight through - HOLD CTRL to slow " +
-                        "time, and throw while you are holding it",
+                        "The orb passes straight through - only a held moment could catch it.",
                         HudMessageFeed.Tone.Bad);
 
                     return;
@@ -269,17 +266,14 @@ public sealed class Collector : MonoBehaviour
     }
 
     /// <summary>
-    /// Says why an orb did nothing, naming the era needed and the key for it.
+    /// Says an orb did nothing without naming the era needed - that is the
+    /// puzzle. A wrong-era hit should read as a clear "not this one, try
+    /// another" signal, not a printed answer key.
     /// </summary>
     private static void RejectHit(TimeEra needed, TimeEra current)
     {
-        string key = needed == TimeEra.Past ? "Q"
-            : needed == TimeEra.Future ? "R" : "Q or R";
-
         HudMessageFeed.Post(
-            "The Collector is untouchable in the " + current.ToString().ToUpperInvariant() +
-            " - it can only be hurt in the " + needed.ToString().ToUpperInvariant() +
-            ". Press " + key + ".",
+            "The Collector shrugs off the strike - this is not its vulnerable age.",
             HudMessageFeed.Tone.Bad);
     }
 

@@ -1,18 +1,29 @@
 using UnityEngine;
 
 /// <summary>
-/// Makes the FrozenCity portal visibly change state the instant the Time
-/// Lens is acquired, instead of sitting at the same brightness whether or
-/// not it is actually usable.
+/// Makes a scene-exit portal visibly change state the instant its required
+/// item is acquired, instead of sitting at the same brightness whether or
+/// not it is actually usable. Used on both the MuseumNight->FrozenCity and
+/// FrozenCity->ClockCore portals.
 ///
-/// Before: dim glow, fractured-clock emblem unlit, no particles - it reads
-/// as inert/unstable, matching SceneExitTrigger's "Portal unstable" message.
-/// After: both lights brighten, the emblem glows, particles begin drifting
-/// through the frame, and a one-shot activation cue plays - the player does
-/// not need to read a sign to tell the doorway just changed.
+/// Before: dim glow, emblem unlit, no particles - it reads as
+/// inert/unstable, matching SceneExitTrigger's "...unstable" rejection
+/// message. After: lights brighten, particles begin drifting through the
+/// frame, and a one-shot activation cue plays - the player does not need to
+/// read a sign to tell the doorway just changed.
 /// </summary>
 public sealed class PortalActivation : MonoBehaviour
 {
+    /// <summary>Mirrors SceneExitTrigger's own item gate, so this reads the
+    /// same requirement rather than needing it duplicated/hardcoded here.</summary>
+    public enum RequiredItem
+    {
+        TimeLens,
+        ChronoHourglass,
+    }
+
+    [SerializeField] private RequiredItem requiredItem = RequiredItem.TimeLens;
+
     [SerializeField] private Light portalGlow;
     [SerializeField] private Light signGlow;
     [SerializeField] private MeshRenderer clockEmblem;
@@ -43,9 +54,18 @@ public sealed class PortalActivation : MonoBehaviour
         ApplyState(active, instant: false);
     }
 
-    private static bool IsUnlocked()
+    private bool IsUnlocked()
     {
-        return GameManager.Instance != null && GameManager.Instance.State.hasTimeLens;
+        if (GameManager.Instance == null)
+        {
+            return false;
+        }
+
+        GameState state = GameManager.Instance.State;
+
+        return requiredItem == RequiredItem.TimeLens
+            ? state.hasTimeLens
+            : state.hasChronoHourglass;
     }
 
     private void ApplyState(bool active, bool instant)

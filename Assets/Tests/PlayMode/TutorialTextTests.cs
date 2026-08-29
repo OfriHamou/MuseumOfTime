@@ -122,8 +122,17 @@ public sealed class TutorialTextTests
             "The tutorial text did not substitute the player's live energy value.");
     }
 
+    /// <summary>
+    /// WorldObjectiveText's intended architecture (Step 5.4 follow-up, the
+    /// FrozenCity spawn-plaque fix): prefer the live, always-current
+    /// <see cref="ObjectiveTracker"/> - the same source the HUD banner
+    /// reads - and only fall back to <see cref="RoomEntryTrigger"/>'s static
+    /// value if no tracker exists. This replaces the old
+    /// RoomEntryTrigger-first test, which asserted the behaviour this fix
+    /// deliberately changed.
+    /// </summary>
     [UnityTest]
-    public IEnumerator ObjectiveText_ReflectsRoomEntryTriggersCurrentObjective()
+    public IEnumerator ObjectiveText_PrefersLiveObjectiveTrackerObjective()
     {
         GameObject objective = GameObject.Find("TutorialPlaques")
             .transform.Find("Plaque_Objective")?.gameObject;
@@ -131,10 +140,24 @@ public sealed class TutorialTextTests
         Assert.IsNotNull(objective, "No Plaque_Objective in the scene.");
         Assert.IsNotNull(objective.GetComponent<WorldObjectiveText>(), "Plaque_Objective has no WorldObjectiveText.");
 
+        TMP_Text label = objective.GetComponent<TMP_Text>();
+
+        // A: with a live ObjectiveTracker present (MuseumNight always has
+        // one), the plaque reflects ITS objective, not a hand-set trigger
+        // value - drive the tracker into a known state via the real
+        // GameManager API rather than asserting an exact hardcoded string.
+        Assert.IsNotNull(ObjectiveTracker.Instance, "No live ObjectiveTracker in the scene.");
+        GameManager.Instance.AcquireTimeLens();
+        yield return null;
+
+        StringAssert.Contains(ObjectiveTracker.Instance.Objective, label.text);
+
+        // B: with no ObjectiveTracker available, RoomEntryTrigger's static
+        // value remains a valid fallback so the plaque never goes silent.
+        typeof(ObjectiveTracker).GetProperty("Instance").SetValue(null, null);
         typeof(RoomEntryTrigger).GetProperty("CurrentObjective").SetValue(null, "Test Objective Text");
         yield return null;
 
-        TMP_Text label = objective.GetComponent<TMP_Text>();
         StringAssert.Contains("Test Objective Text", label.text);
     }
 }
