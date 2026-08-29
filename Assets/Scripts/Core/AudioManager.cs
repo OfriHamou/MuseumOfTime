@@ -536,6 +536,16 @@ public sealed class AudioManager : MonoBehaviour
 
         string scene = SceneManager.GetActiveScene().name;
 
+        // FrozenCity plays no background music by design - only the SFX cue
+        // set (bell, footsteps, orb, shard pickups, Warden/Shadow cues, era
+        // switch) through the separate sfxSource, which this leaves untouched.
+        if (scene == "FrozenCity")
+        {
+            musicSource.Stop();
+            musicSource.clip = null;
+            return;
+        }
+
         AudioClip ambience = scene switch
         {
             "MainMenu" => ProceduralAudioClips.MainMenuTheme("MainMenuTheme"),

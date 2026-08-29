@@ -110,20 +110,31 @@ public sealed class EnemyNameplate : MonoBehaviour
         label.text = Describe();
     }
 
-    /// <summary>World-space top of the agent's visible body.</summary>
+    /// <summary>
+    /// World-space top of the agent's visible body.
+    ///
+    /// This used to look for a child literally named "Body", which neither
+    /// enemy prefab has (TimeWarden's visual child is "TimeWardenVisual",
+    /// ChronologicalShadow's is "ChronoShadowVisual") - the lookup always
+    /// failed, so this fell back to the agent's raw pivot position, which
+    /// sits inside the model rather than above its head. The label rendered
+    /// through the enemy's own body instead of floating over it.
+    ///
+    /// Measuring every renderer under the agent instead - excluding this
+    /// nameplate's own renderer - works regardless of how the visual child is
+    /// named.
+    /// </summary>
     private float TopOfBody(Transform agent)
     {
-        Transform body = agent.Find("Body");
-
-        if (body == null)
-        {
-            return agent.position.y;
-        }
-
         float top = float.MinValue;
 
-        foreach (Renderer r in body.GetComponentsInChildren<Renderer>())
+        foreach (Renderer r in agent.GetComponentsInChildren<Renderer>())
         {
+            if (r.transform == transform)
+            {
+                continue;
+            }
+
             top = Mathf.Max(top, r.bounds.max.y);
         }
 
