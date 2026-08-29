@@ -41,14 +41,39 @@ public sealed class Collector : MonoBehaviour
 
     [Header("Phase 3 - Future: the Hourglass is mandatory to survive")]
     [Tooltip("Health lost per second while the erasing moment runs and time " +
-             "is NOT slowed.")]
-    [SerializeField] private float erosionDamagePerSecond = 6f;
+             "is NOT slowed. Lowered from 6 in the same balance pass that cut " +
+             "the Hourglass's drain rate - a player still has to spend most " +
+             "of the phase slowing time to survive, but a brief unslowed " +
+             "moment (releasing Ctrl to let energy recover) no longer costs " +
+             "a third of the health bar before they can react to it.")]
+    [SerializeField] private float erosionDamagePerSecond = 4f;
 
     [Tooltip("Seconds of calm after the phase begins before the erosion " +
              "starts, so the phase can be read before it is survived.")]
     [SerializeField] private float erosionGraceSeconds = 4f;
 
+    [Tooltip("Slowed hits needed to end the fight, instead of just one - so " +
+             "the finish is a short final stretch rather than a single lucky " +
+             "throw.")]
+    [SerializeField] private int finalHitsRequired = 3;
+
+    [Tooltip("Real seconds the explosion plays before Victory loads. Real " +
+             "time, not game time, so it is not stretched by Slow Time still " +
+             "being held when the last hit lands.")]
+    [SerializeField] private float defeatDelaySeconds = 1.8f;
+
     private float erosionBeginsAt;
+    private int finalHitsTaken;
+
+    // Accumulates fractional damage between frames. TakeDamage only takes
+    // whole ints, and CeilToInt on a single frame's share of a per-second
+    // rate rounds any non-zero sliver up to a whole point - at 60fps that
+    // turned "4 per second" into 1 point EVERY frame, i.e. 60 per second,
+    // independent of the configured rate entirely. A full health bar was
+    // gone in under two seconds any time erosion was live, which is what
+    // "near-instant death" actually was: not the rate in the Inspector, but
+    // this rounding turning it into a framerate multiple of itself.
+    private float erosionDamageAccumulator;
 
     private ChronoHourglass playerHourglass;
     private SceneLoader sceneLoader;
@@ -60,6 +85,51 @@ public sealed class Collector : MonoBehaviour
 
     /// <summary>Which phase the fight is in right now.</summary>
     public Stage CurrentStage => stage;
+
+    /// <summary>
+    /// True whenever the erosion warning should be on screen: Phase 3 has
+    /// begun and the Hourglass is not currently holding it back. The HUD is
+    /// the only reader of this - nothing here depends on the HUD existing.
+    /// </summary>
+    public bool ErosionWarningActive => stage == Stage.Future && !TimeIsSlowed();
+
+    /// <summary>True while the grace window is still running, before erosion can deal damage.</summary>
+    public bool ErosionInGrace => stage == Stage.Future && Time.time < erosionBeginsAt;
+
+    /// <summary>Seconds left in the grace window, floored at zero once it has elapsed.</summary>
+    public float ErosionGraceRemaining => Mathf.Max(0f, erosionBeginsAt - Time.time);
+
+    /// <summary>The grace window remaining, as a 0-1 fraction, for a fill bar.</summary>
+    public float ErosionGraceFraction =>
+        erosionGraceSeconds <= 0f ? 0f : Mathf.Clamp01(ErosionGraceRemaining / erosionGraceSeconds);
+
+    /// <summary>
+    /// One continuous meter spanning the whole fight, for the HUD boss bar.
+    /// Every phase's own advance condition (a shield hit, the Present hit,
+    /// the final slowed hit) already increments this - nothing here decides
+    /// on its own what "counts", so the bar can never disagree with what
+    /// actually landed. hitsToBreakShield + 2: one meaningful hit each for
+    /// Present and Future, since both need exactly one correct-era strike.
+    /// </summary>
+    public int BossHitsLanded { get; private set; }
+
+    private int BossHitsTotal => hitsToBreakShield + 1 + finalHitsRequired;
+
+    /// <summary>How many of the final phase's required hits have landed. Read by VFX/SFX for per-hit feedback.</summary>
+    public int FinalHitsTaken => finalHitsTaken;
+
+    /// <summary>How many final-phase hits end the fight.</summary>
+    public int FinalHitsRequired => finalHitsRequired;
+
+    /// <summary>True while the fight is on and the bar should be visible.</summary>
+    public bool BossBarActive => stage != Stage.Defeated;
+
+    /// <summary>"SHIELD" while the barrier still holds, "INTEGRITY" once it is down.</summary>
+    public string BossBarLabel => stage == Stage.Shielded ? "SHIELD" : "INTEGRITY";
+
+    /// <summary>Remaining boss "health", as a 0-1 fraction, for a fill bar.</summary>
+    public float BossProgressFraction =>
+        BossHitsTotal <= 0 ? 0f : Mathf.Clamp01(1f - ((float)BossHitsLanded / BossHitsTotal));
 
     private void Awake()
     {
@@ -108,12 +178,23 @@ public sealed class Collector : MonoBehaviour
 
         // "Mandatory to survive", not merely helpful: without the Hourglass
         // active, the erasing moment erodes Noa instead of the Collector.
+        //
+        // This names the CAUSE, not the fix - "Hold CTRL to slow time" used
+        // to be printed right here, which handed a player who died reading
+        // it the exact answer to a puzzle the fight is built around. A death
+        // message's job is to explain why you died, not what to do instead.
         if (GameManager.Instance != null)
         {
-            RespawnService.LastCauseOfDeath =
-                "The erasing moment caught up with you. Hold CTRL to slow time.";
+            erosionDamageAccumulator += erosionDamagePerSecond * Time.deltaTime;
+            int wholeDamage = Mathf.FloorToInt(erosionDamageAccumulator);
 
-            GameManager.Instance.TakeDamage(Mathf.CeilToInt(erosionDamagePerSecond * Time.deltaTime));
+            if (wholeDamage > 0)
+            {
+                erosionDamageAccumulator -= wholeDamage;
+
+                RespawnService.LastCauseOfDeath = "Consumed by temporal erosion.";
+                GameManager.Instance.TakeDamage(wholeDamage);
+            }
         }
     }
 
@@ -194,6 +275,7 @@ public sealed class Collector : MonoBehaviour
                 }
 
                 hitsTaken++;
+                BossHitsLanded++;
 
                 if (hitsTaken >= hitsToBreakShield)
                 {
@@ -225,11 +307,21 @@ public sealed class Collector : MonoBehaviour
                 }
 
                 stage = Stage.Future;
+                BossHitsLanded++;
                 erosionBeginsAt = Time.time + erosionGraceSeconds;
 
                 HudMessageFeed.Post(
                     "It flees to a moment that has not happened yet.",
                     HudMessageFeed.Tone.Good);
+
+                // The loud, one-time announcement that the phase itself has
+                // begun. This used to be the only phase transition with no
+                // warning at all: the player read "it flees to a moment that
+                // has not happened yet", then started silently losing health
+                // a few seconds later with nothing on screen explaining why.
+                HudMessageFeed.Post(
+                    "THE TIMELINE IS COLLAPSING\nTemporal erosion is consuming you.",
+                    HudMessageFeed.Tone.Bad);
 
                 break;
 
@@ -259,8 +351,24 @@ public sealed class Collector : MonoBehaviour
                     return;
                 }
 
-                stage = Stage.Defeated;
-                Defeat();
+                finalHitsTaken++;
+                BossHitsLanded++;
+
+                if (finalHitsTaken >= finalHitsRequired)
+                {
+                    stage = Stage.Defeated;
+                    StartCoroutine(DefeatSequence());
+                }
+                else
+                {
+                    int left = finalHitsRequired - finalHitsTaken;
+
+                    HudMessageFeed.Post(
+                        "The held moment scars it - " + left + " more hit" +
+                        (left == 1 ? "" : "s") + " needed",
+                        HudMessageFeed.Tone.Good);
+                }
+
                 break;
         }
     }
@@ -275,6 +383,29 @@ public sealed class Collector : MonoBehaviour
         HudMessageFeed.Post(
             "The Collector shrugs off the strike - this is not its vulnerable age.",
             HudMessageFeed.Tone.Bad);
+    }
+
+    /// <summary>
+    /// The short beat between the finishing hit and the scene change: stage
+    /// is already Defeated so RegisterOrbHit's guard rejects anything else
+    /// that lands, and the erosion in Update stops on its own the same way
+    /// (it only runs while stage == Future). GameplayVfx/AudioManager pick up
+    /// the explosion from IsDefeated flipping true, the same polling pattern
+    /// they already use for a fracture breaking or a Warden freezing.
+    /// </summary>
+    private System.Collections.IEnumerator DefeatSequence()
+    {
+        // Landing this hit requires Slow Time, so time may still be scaled
+        // down right now - waited in real seconds so the explosion is not
+        // dragged out by whatever the player happened to be holding.
+        Time.timeScale = 1f;
+        Time.fixedDeltaTime = 0.02f;
+
+        HudMessageFeed.Post("The Collector unravels.", HudMessageFeed.Tone.Good);
+
+        yield return new WaitForSecondsRealtime(defeatDelaySeconds);
+
+        Defeat();
     }
 
     private void Defeat()

@@ -10,10 +10,12 @@ using UnityEngine;
 public sealed class ChronoHourglass : MonoBehaviour
 {
     [SerializeField] private float slowScale = 0.3f;
-    [Tooltip("Energy per second while slowing time. At 18 a full bar bought " +
-             "barely five seconds, which is less than one aimed throw takes " +
-             "once the slowdown has stretched the orb's flight.")]
-    [SerializeField] private float energyDrainPerSecond = 9f;
+    [Tooltip("Energy per second while slowing time. At 9 a full bar bought " +
+             "roughly eleven seconds - survivable, but the ClockCore Phase 3 " +
+             "fight needs enough held time to read the erosion warning, aim " +
+             "through the stretched flight of a thrown orb, AND land it, not " +
+             "just one of those. 6/sec gives a full bar ~16-17 seconds.")]
+    [SerializeField] private float energyDrainPerSecond = 6f;
 
     [Tooltip("Ignore the item flag. For testing the first scene only.")]
     [SerializeField] private bool alwaysAvailable;

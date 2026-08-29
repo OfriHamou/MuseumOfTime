@@ -159,14 +159,22 @@ public sealed class NoaAnimatorTests
     [UnityTest]
     public IEnumerator Grounded_IsReportedToTheAnimator()
     {
-        // Let the player settle onto the floor.
-        for (int i = 0; i < 60; i++)
-        {
-            yield return null;
-        }
+        // Wait for the CharacterController itself to genuinely settle,
+        // rather than assuming a fixed frame count is always enough - see
+        // PlayModePhysicsWait for why a fixed wait is the wrong tool here.
+        CharacterController cc = player.GetComponent<CharacterController>();
+        yield return PlayModePhysicsWait.UntilGrounded(cc);
+
+        // One more frame: PlayerAnimatorDriver.Update() mirrors isGrounded
+        // onto the Animator the same frame, but execution order between it
+        // and PlayerController's own Update is not guaranteed, so the
+        // Animator parameter can still be one frame behind the controller.
+        yield return null;
 
         Assert.IsTrue(
             animator.GetBool("IsGrounded"),
-            "IsGrounded was false while the player was resting on the floor.");
+            "IsGrounded was false on the Animator even though the " +
+            "CharacterController itself reports grounded - the driver is " +
+            "not forwarding the real state.");
     }
 }

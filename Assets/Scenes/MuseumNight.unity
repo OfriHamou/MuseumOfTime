@@ -10877,7 +10877,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &456689961
 RectTransform:
   m_ObjectHideFlags: 0
@@ -11235,7 +11235,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &481637123
 RectTransform:
   m_ObjectHideFlags: 0
@@ -31130,6 +31130,10 @@ MonoBehaviour:
   interactPromptText: {fileID: 965262689}
   objectiveText: {fileID: 97712370}
   objectiveHintText: {fileID: 862475897}
+  erosionWarningRoot: {fileID: 0}
+  erosionWarningGroup: {fileID: 0}
+  erosionWarningTitle: {fileID: 0}
+  erosionWarningStatus: {fileID: 0}
 --- !u!4 &1218140780 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4667274626914980314, guid: 179408232083da943b7340232ae80ad5, type: 3}

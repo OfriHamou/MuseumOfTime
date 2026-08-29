@@ -89,6 +89,10 @@ public sealed class AudioManager : MonoBehaviour
     private bool[] shadowWasFrozen;
     private bool[] fractureWasBroken;
 
+    private Collector collector;
+    private int lastCollectorFinalHits;
+    private bool collectorWasDefeated;
+
     private int lastShardCount;
     private int lastDetectedCount;
     private int lastThrownCount;
@@ -196,6 +200,8 @@ public sealed class AudioManager : MonoBehaviour
         fractures = FindObjectsByType<FracturedObject>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         fractureWasBroken = new bool[fractures.Length];
 
+        collector = FindAnyObjectByType<Collector>();
+
         GameObject bell = GameObject.Find("TowerBell");
         if (bell != null)
         {
@@ -241,6 +247,7 @@ public sealed class AudioManager : MonoBehaviour
         UpdateShadows();
         UpdateFractures();
         UpdateBell();
+        UpdateCollector();
     }
 
     /// <summary>
@@ -488,6 +495,40 @@ public sealed class AudioManager : MonoBehaviour
         }
 
         bellWasRinging = ringing;
+    }
+
+    // ---------------- Collector: per-hit and defeat cues ----------------
+
+    /// <summary>
+    /// SealRestored (already "a correct action was accepted" elsewhere) for
+    /// each valid final-phase hit, Fracture + Bell together for the defeat
+    /// boom - all three clips already exist for other moments, none of them
+    /// tied to the orb's own bounce sound, so nothing here doubles up with
+    /// the OrbImpact thud UpdateOrb already plays on every physical contact.
+    /// </summary>
+    private void UpdateCollector()
+    {
+        if (collector == null)
+        {
+            return;
+        }
+
+        int finalHits = collector.FinalHitsTaken;
+
+        if (finalHits > lastCollectorFinalHits)
+        {
+            Play(Sfx.SealRestored);
+        }
+
+        lastCollectorFinalHits = finalHits;
+
+        if (collector.IsDefeated && !collectorWasDefeated)
+        {
+            Play(Sfx.Fracture);
+            Play(Sfx.Bell);
+        }
+
+        collectorWasDefeated = collector.IsDefeated;
     }
 
     // ---------------- event handlers ----------------

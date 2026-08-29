@@ -31,6 +31,10 @@ public sealed class GameplayVfx : MonoBehaviour
     private bool[] shadowWasFrozen;
     private int lastShardCount;
 
+    private Collector collector;
+    private int lastCollectorFinalHits;
+    private bool collectorWasDefeated;
+
     /// <summary>Exposed so a wiring test can confirm the sparkle actually played.</summary>
     public ParticleSystem ShardBurst => shardBurst;
 
@@ -63,6 +67,8 @@ public sealed class GameplayVfx : MonoBehaviour
 
         shadows = FindObjectsByType<ShadowAI>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         shadowWasFrozen = new bool[shadows.Length];
+
+        collector = FindAnyObjectByType<Collector>();
 
         if (GameManager.Instance != null)
         {
@@ -127,6 +133,41 @@ public sealed class GameplayVfx : MonoBehaviour
 
             shadowWasFrozen[i] = frozen;
         }
+
+        UpdateCollector();
+    }
+
+    /// <summary>
+    /// Reuses the same two bursts the rest of the fight already uses: a
+    /// freeze-blue spark per valid final-phase hit landed, and the fracture
+    /// dust (paired with the same spark, for a bigger single moment) the
+    /// instant the Collector is defeated. No new particle system for a
+    /// one-off ending beat.
+    /// </summary>
+    private void UpdateCollector()
+    {
+        if (collector == null)
+        {
+            return;
+        }
+
+        int finalHits = collector.FinalHitsTaken;
+
+        if (finalHits > lastCollectorFinalHits)
+        {
+            PlayFreezeBurst(collector.transform.position);
+        }
+
+        lastCollectorFinalHits = finalHits;
+
+        if (collector.IsDefeated && !collectorWasDefeated)
+        {
+            fractureBurst.transform.position = collector.transform.position;
+            fractureBurst.Play();
+            PlayFreezeBurst(collector.transform.position);
+        }
+
+        collectorWasDefeated = collector.IsDefeated;
     }
 
     private void PlayFreezeBurst(Vector3 position)
