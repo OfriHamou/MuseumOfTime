@@ -93,10 +93,19 @@ public sealed class AudioCoverageTests
             "Expected exactly one AudioListener, found " + listeners.Length + ".");
     }
 
+    /// <summary>
+    /// FrozenCity intentionally has no background music (see
+    /// AudioManager.PlayAmbienceForActiveScene, which stops/clears
+    /// musicSource for that scene by design) - only its SFX cue set (bell,
+    /// footsteps, orb, shard pickups, Warden/Shadow cues) plays, through the
+    /// separate sfxSource. Every other gameplay scene still needs a real,
+    /// playing ambience clip, or it silently ships mute with no obvious
+    /// symptom - that half of the guarantee is unchanged.
+    /// </summary>
     [UnityTest]
-    public IEnumerator EveryGameplayScenePlaysItsOwnAmbience()
+    public IEnumerator EveryGameplaySceneMatchesItsIntendedAmbience()
     {
-        foreach (string sceneName in new[] { "MuseumNight", "FrozenCity", "ClockCore" })
+        foreach (string sceneName in new[] { "MuseumNight", "ClockCore" })
         {
             yield return Load(sceneName);
 
@@ -106,10 +115,7 @@ public sealed class AudioCoverageTests
             // A few frames: ambience starts from Start(), not Awake().
             for (int i = 0; i < 5; i++) { yield return null; }
 
-            FieldInfo field = typeof(AudioManager).GetField(
-                "musicSource", BindingFlags.Instance | BindingFlags.NonPublic);
-
-            var music = field.GetValue(manager) as AudioSource;
+            AudioSource music = MusicSource(manager);
             Assert.IsNotNull(music, sceneName + " has no music source.");
 
             Assert.IsNotNull(
@@ -120,6 +126,35 @@ public sealed class AudioCoverageTests
                 music.isPlaying,
                 sceneName + "'s ambience is not playing.");
         }
+
+        // FrozenCity: the opposite assertion, on purpose - no ambience clip,
+        // nothing playing, but the AudioManager (and therefore every SFX
+        // cue) is still fully present and functioning.
+        yield return Load("FrozenCity");
+
+        var frozenCityManager = UnityEngine.Object.FindFirstObjectByType<AudioManager>();
+        Assert.IsNotNull(frozenCityManager, "FrozenCity has no AudioManager.");
+
+        for (int i = 0; i < 5; i++) { yield return null; }
+
+        AudioSource frozenCityMusic = MusicSource(frozenCityManager);
+        Assert.IsNotNull(frozenCityMusic, "FrozenCity has no music source.");
+
+        Assert.IsNull(
+            frozenCityMusic.clip,
+            "FrozenCity is intentionally silent - no background music clip should be assigned.");
+
+        Assert.IsFalse(
+            frozenCityMusic.isPlaying,
+            "FrozenCity is intentionally silent - the music source should not be playing.");
+    }
+
+    private static AudioSource MusicSource(AudioManager manager)
+    {
+        FieldInfo field = typeof(AudioManager).GetField(
+            "musicSource", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        return field.GetValue(manager) as AudioSource;
     }
 
     [UnityTest]
