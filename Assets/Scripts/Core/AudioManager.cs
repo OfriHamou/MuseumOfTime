@@ -89,6 +89,10 @@ public sealed class AudioManager : MonoBehaviour
     private bool[] shadowWasFrozen;
     private bool[] fractureWasBroken;
 
+    private Collector collector;
+    private int lastCollectorFinalHits;
+    private bool collectorWasDefeated;
+
     private int lastShardCount;
     private int lastDetectedCount;
     private int lastThrownCount;
@@ -134,6 +138,19 @@ public sealed class AudioManager : MonoBehaviour
         {
             musicSource.outputAudioMixerGroup = musicGroup;
             sfxSource.outputAudioMixerGroup = sfxGroup;
+
+            // UpdateSlowTime only transitions the mixer when IsSlowing changes,
+            // so it never runs at all in a scene where the player hasn't
+            // touched the Hourglass yet. Whatever snapshot the mixer asset
+            // happened to save as current (e.g. SlowTime, with its 700Hz
+            // lowpass) would then silently stay active for the whole scene,
+            // making all audio through it sound muffled to the point of
+            // inaudible. Force the unfiltered snapshot on immediately so
+            // playback always starts from a known-good state.
+            if (normalSnapshot != null)
+            {
+                normalSnapshot.TransitionTo(0f);
+            }
         }
     }
 
@@ -183,6 +200,8 @@ public sealed class AudioManager : MonoBehaviour
         fractures = FindObjectsByType<FracturedObject>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         fractureWasBroken = new bool[fractures.Length];
 
+        collector = FindAnyObjectByType<Collector>();
+
         GameObject bell = GameObject.Find("TowerBell");
         if (bell != null)
         {
@@ -228,6 +247,7 @@ public sealed class AudioManager : MonoBehaviour
         UpdateShadows();
         UpdateFractures();
         UpdateBell();
+        UpdateCollector();
     }
 
     /// <summary>
@@ -477,6 +497,40 @@ public sealed class AudioManager : MonoBehaviour
         bellWasRinging = ringing;
     }
 
+    // ---------------- Collector: per-hit and defeat cues ----------------
+
+    /// <summary>
+    /// SealRestored (already "a correct action was accepted" elsewhere) for
+    /// each valid final-phase hit, Fracture + Bell together for the defeat
+    /// boom - all three clips already exist for other moments, none of them
+    /// tied to the orb's own bounce sound, so nothing here doubles up with
+    /// the OrbImpact thud UpdateOrb already plays on every physical contact.
+    /// </summary>
+    private void UpdateCollector()
+    {
+        if (collector == null)
+        {
+            return;
+        }
+
+        int finalHits = collector.FinalHitsTaken;
+
+        if (finalHits > lastCollectorFinalHits)
+        {
+            Play(Sfx.SealRestored);
+        }
+
+        lastCollectorFinalHits = finalHits;
+
+        if (collector.IsDefeated && !collectorWasDefeated)
+        {
+            Play(Sfx.Fracture);
+            Play(Sfx.Bell);
+        }
+
+        collectorWasDefeated = collector.IsDefeated;
+    }
+
     // ---------------- event handlers ----------------
 
     private void OnStateChanged()
@@ -523,11 +577,25 @@ public sealed class AudioManager : MonoBehaviour
 
         string scene = SceneManager.GetActiveScene().name;
 
+        // FrozenCity plays no background music by design - only the SFX cue
+        // set (bell, footsteps, orb, shard pickups, Warden/Shadow cues, era
+        // switch) through the separate sfxSource, which this leaves untouched.
+        if (scene == "FrozenCity")
+        {
+            musicSource.Stop();
+            musicSource.clip = null;
+            return;
+        }
+
         AudioClip ambience = scene switch
         {
             "MainMenu" => ProceduralAudioClips.MainMenuTheme("MainMenuTheme"),
             "FrozenCity" => ProceduralAudioClips.FrozenAmbience("FrozenAmbience"),
             "ClockCore" => ProceduralAudioClips.ClockCoreAmbience("ClockCoreAmbience"),
+            // Victory had no AudioManager at all - the screen was completely
+            // silent. Reusing the calm main theme rather than writing a new
+            // clip generator for a single scene that just needs SOME music.
+            "Victory" => ProceduralAudioClips.MainMenuTheme("VictoryTheme"),
             _ => ProceduralAudioClips.MuseumAmbience("MuseumAmbience"),
         };
 

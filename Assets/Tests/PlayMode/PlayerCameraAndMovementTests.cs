@@ -233,11 +233,14 @@ public sealed class PlayerCameraAndMovementTests
     [UnityTest]
     public IEnumerator Jump_RaisesThePlayerOffTheGround()
     {
-        // Let the player settle onto the floor first.
-        for (int i = 0; i < 60; i++)
-        {
-            yield return null;
-        }
+        // Wait for a genuine grounded state rather than assuming a fixed
+        // frame count always settles the CharacterController. Triggering
+        // the jump before isGrounded is actually true makes
+        // PlayerController.CanJump() reject it (grounded is false and the
+        // coyote-time window has already expired since spawn), so the test
+        // was measuring a jump that silently never fired - "ground and
+        // peak Y were identical" is exactly that, not a height problem.
+        yield return PlayModePhysicsWait.UntilGrounded(player.GetComponent<CharacterController>());
 
         float groundY = player.transform.position.y;
 

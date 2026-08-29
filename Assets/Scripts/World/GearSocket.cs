@@ -41,11 +41,23 @@ public sealed class GearSocket : MonoBehaviour, IInteractable
 
         if (!GearPuzzle.Instance.Installed)
         {
-            GearPuzzle.Instance.TryInstall();
+            if (!GearPuzzle.Instance.TryInstall())
+            {
+                HudMessageFeed.Post(
+                    GearPuzzle.Instance.HasGear
+                        ? "The tower still waits for its missing tooth."
+                        : "There is nowhere to seat a gear you do not have yet.",
+                    HudMessageFeed.Tone.Bad);
+            }
         }
         else if (!GearPuzzle.Instance.Verified)
         {
-            GearPuzzle.Instance.TryVerify();
+            if (!GearPuzzle.Instance.TryVerify())
+            {
+                HudMessageFeed.Post(
+                    "Only a later hour will show if the repair held.",
+                    HudMessageFeed.Tone.Bad);
+            }
         }
     }
 }

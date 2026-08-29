@@ -45,6 +45,15 @@ public sealed class EraSwitchVfx : MonoBehaviour
 
     private void OnEraChanged(TimeEra era)
     {
+        // EraManager can outlive this object across a scene reload; if that
+        // reload happens to leave this instance's own Destroy() racing the
+        // next event fire, particles is a "fake null" native reference by
+        // the time we get here. Guard rather than crash the era switch.
+        if (particles == null)
+        {
+            return;
+        }
+
         if (target != null)
         {
             transform.position = target.position;

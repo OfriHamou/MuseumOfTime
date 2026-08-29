@@ -216,7 +216,21 @@ public sealed class RespawnService : MonoBehaviour
 
         Vector3 destination;
 
-        if (state != null && state.hasCheckpoint)
+        // The checkpoint has to belong to THIS scene. hasCheckpoint/
+        // checkpointPosition persist in GameState across scene transitions
+        // (by design - Continue and cross-scene progress depend on that), so
+        // a player who armed an anchor late in FrozenCity and then walked
+        // through the portal into ClockCore was carrying FrozenCity's raw
+        // world coordinates. The first death in ClockCore before arming a
+        // ClockCore anchor dropped them at those old coordinates inside the
+        // NEW scene's geometry - not the designed spawn, not a real
+        // checkpoint, just whatever ClockCore happens to have at that point
+        // in space. Comparing the scene name is the whole fix: a checkpoint
+        // from a different scene is not a checkpoint here.
+        bool checkpointBelongsToThisScene = state != null && state.hasCheckpoint &&
+            state.checkpointSceneName == UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+
+        if (checkpointBelongsToThisScene)
         {
             destination = state.checkpointPosition + Vector3.up;
             LastUsedAnchor = true;
