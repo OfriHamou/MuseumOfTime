@@ -134,6 +134,19 @@ public sealed class AudioManager : MonoBehaviour
         {
             musicSource.outputAudioMixerGroup = musicGroup;
             sfxSource.outputAudioMixerGroup = sfxGroup;
+
+            // UpdateSlowTime only transitions the mixer when IsSlowing changes,
+            // so it never runs at all in a scene where the player hasn't
+            // touched the Hourglass yet. Whatever snapshot the mixer asset
+            // happened to save as current (e.g. SlowTime, with its 700Hz
+            // lowpass) would then silently stay active for the whole scene,
+            // making all audio through it sound muffled to the point of
+            // inaudible. Force the unfiltered snapshot on immediately so
+            // playback always starts from a known-good state.
+            if (normalSnapshot != null)
+            {
+                normalSnapshot.TransitionTo(0f);
+            }
         }
     }
 
@@ -528,6 +541,10 @@ public sealed class AudioManager : MonoBehaviour
             "MainMenu" => ProceduralAudioClips.MainMenuTheme("MainMenuTheme"),
             "FrozenCity" => ProceduralAudioClips.FrozenAmbience("FrozenAmbience"),
             "ClockCore" => ProceduralAudioClips.ClockCoreAmbience("ClockCoreAmbience"),
+            // Victory had no AudioManager at all - the screen was completely
+            // silent. Reusing the calm main theme rather than writing a new
+            // clip generator for a single scene that just needs SOME music.
+            "Victory" => ProceduralAudioClips.MainMenuTheme("VictoryTheme"),
             _ => ProceduralAudioClips.MuseumAmbience("MuseumAmbience"),
         };
 

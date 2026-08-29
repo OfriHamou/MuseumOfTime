@@ -116,13 +116,14 @@ public sealed class ObjectiveTracker : MonoBehaviour
 
         if (puzzle != null && puzzle.IsSolved)
         {
-            Set("Collect the Time Lens", "The display has unlocked upstairs.");
+            Set("Collect the Time Lens", "Something upstairs has awakened.");
             return;
         }
 
         int restored = puzzle != null ? puzzle.RestoredCount : 0;
 
-        Set("Find the Time Lens", "Restore the Temporal Seals: " + restored + "/3");
+        Set("Find the Time Lens",
+            "Three memories guard what the museum has lost. (" + restored + "/3)");
     }
 
     private void EvaluateFrozenCity(GameState state)
@@ -130,8 +131,7 @@ public sealed class ObjectiveTracker : MonoBehaviour
         if (state.hasChronoHourglass)
         {
             Set("Leave for the Clock Core",
-                "The lit EXIT gate is at the NORTH end of the street, past " +
-                "the clock tower. Walk into it.");
+                "The tower's mechanism points toward what comes next.");
             return;
         }
 
@@ -139,32 +139,33 @@ public sealed class ObjectiveTracker : MonoBehaviour
 
         if (puzzle == null)
         {
-            Set("Reach the clock tower", "Follow the frozen street north.");
+            Set("Reach the clock tower", "The frozen tower has lost a piece of its history.");
             return;
         }
 
         if (!puzzle.HasGear)
         {
             Set("Find the tower's missing gear",
-                "Press Q to reach the PAST, where the gear had not been lost yet.");
+                "What is gone today may still exist before the city froze.");
             return;
         }
 
         if (!puzzle.Installed)
         {
             Set("Fit the gear into the tower",
-                "Press R to return to the PRESENT, then press E at the socket.");
+                "Some things can be carried farther than time.");
             return;
         }
 
         if (!puzzle.Verified)
         {
             Set("Check that the tower still runs",
-                "Press R to reach the FUTURE and inspect the mechanism.");
+                "See what became of what you changed.");
             return;
         }
 
-        Set("Take the Chrono Hourglass", "The tower has given up its reward.");
+        Set("Take the Chrono Hourglass",
+            "The restored rhythm has awakened something that can bend time itself.");
     }
 
     private void EvaluateClockCore(GameState state)
@@ -185,31 +186,24 @@ public sealed class ObjectiveTracker : MonoBehaviour
 
         switch (collector.CurrentStage)
         {
-            // Every line names the ACTION that advances the fight.
-            //
-            // Phase 2 used to read "Survive the summoned Warden", which
-            // describes a hazard rather than a task - a player reads it, deals
-            // with the Warden, and then has nothing to do and walks in circles
-            // waiting for something to happen. What actually moves the fight
-            // on is hitting the Collector in the right era, so say that first
-            // and treat the Warden as the complication it is.
+            // The objective names the ACTION that advances the fight; the
+            // hint points at the idea (which era, what changed) without
+            // naming it outright or spelling out the button sequence - the
+            // era itself is the puzzle here, not just an input to press.
             case Collector.Stage.Shielded:
-                Set("Hit the Collector in the PAST",
-                    "Press Q until the era reads PAST, then throw Chrono Orbs " +
-                    "at it with the left mouse button. Two hits break the shield.");
+                Set("Break the Collector's shield",
+                    "The barrier was not always this strong.");
                 break;
 
             case Collector.Stage.Present:
-                Set("Hit the Collector in the PRESENT",
-                    "Press R until the era reads PRESENT, then hit it with the " +
-                    "Orb again. A Warden is hunting you - freeze it with an Orb " +
-                    "if it gets close.");
+                Set("Press the attack",
+                    "The present protects what rules it.");
                 break;
 
             default:
-                Set("Hit the Collector in the FUTURE, with time slowed",
-                    "Press R until the era reads FUTURE, HOLD CTRL to slow " +
-                    "time, and hit it with the Orb while you are holding it.");
+                Set("Finish what you started",
+                    "Even the strongest things decay with enough time. " +
+                    "You carry something that can make a moment last.");
                 break;
         }
     }
